@@ -7,6 +7,9 @@ import math
 from einops import rearrange, repeat, reduce, einsum
 
 class ConvResidual(nn.Module):
+    """
+    in -> Residual(conv, bn, gelu, conv), bn, conv, gelu, bn -> out
+    """
     def __init__(self, in_channels, out_channels, kernel_size = 15):
         super(ConvResidual, self).__init__()
         self.net = nn.Sequential(
@@ -40,7 +43,7 @@ class DownsampleBlock(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=15):
         super(DownsampleBlock, self).__init__()
         self.resconv = ConvResidual(in_channels, out_channels, kernel_size)
-        self.downsample = DownSample()
+        self.downsample = nn.MaxPool1d(kernel_size=2, stride=2)
 
     def forward(self, x):
         x = self.resconv(x)
@@ -125,6 +128,7 @@ class AttentionBlock(nn.Module):
         v = self.w_v(v)       
         
         W = einsum("... i d, ... j d -> ... i j", q, k) * self.scale
+        attn = W.softmax(dim=-1)
         
         attn = self.w_o(attn)
         
@@ -156,26 +160,3 @@ class TransformerBlock(nn.Module):
         att = self.dropout2(att)
         x = x + att
         return x
-    
-# class SwinBlock(nn.Module):
-#     def __init__(self):
-#         super(SwinBlock, self).__init__()
-        
-
-# class SwinUNet1d(nn.Module):
-#     def __init__(self):
-#         super(SwinUNet1d, self).__init__()
-#         self.patch_size = 4
-#         self.embed_dim = 48
-#         self.n_heads = 4
-        
-        
-        
-        
-#     def forward(self, x):
-#         assert len(x.shape) == 3, 'Input dimension mismatch, expected 3, got %d' % (len(x.shape))
-#         B, C, T = x.shape
-#         assert C == 1, 'Input dimension mismatch, expected 1, got %d' % (C)
-        
-#         x = rearrange(x, 'b c (t r) -> b t (c r)', r = self.patch_size) # x.shape = (B, T//self.patch_size, self.patch_size)
-#         x = 
