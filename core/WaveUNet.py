@@ -267,11 +267,13 @@ class TransformerBlock(nn.Module):
         return self.net(att)
     
 class CrossAttentionWavUNet(nn.Module):
-    def __init__(self, N_diffusion = 1000, conditional_dim = 32):
+    def __init__(self, N_diffusion = 1000, conditional_dim = 32, out_dims = 1):
         super(CrossAttentionWavUNet, self).__init__()
         
         self.in_res_conv = ConvResidual(1, 4, 15)
-        self.out_res_conv= ConvResidual(4, 1, 15)
+        self.out_res_conv= ConvResidual(4, out_dims, 15)
+        
+        self.out_dims = out_dims
         
         # (4, 8000)
         self.DC1 = nn.Sequential(
