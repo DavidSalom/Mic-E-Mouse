@@ -37,6 +37,9 @@ class VCTK_Dataset(Dataset, CacheMixin):
         self.VCTK_root_path = VCTK_root_path
         self._init_ds()
         
+        self.clip_min = -10.4615
+        self.clip_max = 11.3003
+        
         self.resample_rate = kwargs.get('resample_rate', 8000)
 
     def _init_ds(self, other) -> None:
@@ -128,6 +131,13 @@ class VCTK_Dataset(Dataset, CacheMixin):
 
         if waveform.shape[1] < sample_rate:
             waveform = torch.nn.functional.pad(waveform, (0, sample_rate - waveform.shape[1]))    
+        
+        # Normalize to zero mean and unit variance
+        waveform = (waveform - waveform.mean())/waveform.std()
+        # Clip to computed min and max
+        waveform = torch.clip(waveform, self.clip_min, self.clip_max)
+        # Normalize to [-1, 1]
+        waveform = 2 * (waveform - self.clip_min) / (self.clip_max - self.clip_min) - 1
         
         return waveform, sample_rate
     
