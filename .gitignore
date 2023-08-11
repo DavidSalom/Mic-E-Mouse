@@ -3,3 +3,4 @@ raw_data/*
 *.pyc
 local_*.ipynb
 .cache/*
+wandb/*

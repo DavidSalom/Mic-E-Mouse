@@ -26,7 +26,7 @@ class VCTK_Dataset(Dataset, CacheMixin):
         idx_to_wav_offset_dict (dict): A dictionary mapping from sample index to a tuple of wav file index and offset.
     """
 
-    def __init__(self, VCTK_root_path : str, **kwargs : dict[str, any]):
+    def __init__(self, VCTK_root_path : str, clip_min : float = -10.4615, clip_max : float = 11.3003, **kwargs : dict[str, any]):
         """
         Args:
             VCTK_root_path (str): Path to the VCTK dataset parent folder, which should contain wav48 and txt folders.
@@ -37,8 +37,8 @@ class VCTK_Dataset(Dataset, CacheMixin):
         self.VCTK_root_path = VCTK_root_path
         self._init_ds()
         
-        self.clip_min = -10.4615
-        self.clip_max = 11.3003
+        self.clip_min = clip_min
+        self.clip_max = clip_max
         
         self.resample_rate = kwargs.get('resample_rate', 8000)
 
@@ -155,3 +155,31 @@ class VCTK_Dataset(Dataset, CacheMixin):
         """    
         resampled_waveform = torchaudio.transforms.Resample(sample_rate, new_samplerate)(waveform)
         return resampled_waveform, new_samplerate
+
+
+# Function to compute the quantiles of the dataset, used for clipping
+def compute_statistics_hardcoded(loader, quantile=0.95):
+    val = torch.concatenate([X for X, _ in loader], dim=0) # v. inefficient, but it's a one-time thing (hopefully) TODO: think of a better way to do this
+    val = ( val - val.mean(dim=-1, keepdim=True) ) / val.std(dim=-1, keepdim=True)
+    clip_max = val.max(dim = -1)[0].quantile(quantile)
+    clip_min = val.min(dim = -1)[0].quantile(1 - quantile)
+    return clip_min, clip_max
+
+def setup_dataset(Config):
+    DS = VCTK_Dataset.cache_constructor(Config.VCTK_root_path, resample_rate=Config.resample_rate)
+
+    # Split the dataset into training, validation, and test sets
+    logging.info(f"Splitting the dataset into {Config.train_split * 100}% training, {Config.val_split * 100}% validation, and {Config.test_split * 100}% test sets.")
+    N_train = int(len(DS) * Config.train_split)
+    N_val = int(len(DS) * Config.val_split)
+    N_test = len(DS) - N_train - N_val
+    logging.info(f"Number of training samples: {N_train}; number of validation samples: {N_val}; number of test samples: {N_test}.")
+    train_set, val_set, test_set = torch.utils.data.random_split(DS, [N_train, N_val, N_test], generator=torch.Generator().manual_seed(Config.seed))
+
+    # Create data loaders
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=Config.batch_size, shuffle=True, num_workers=4)
+    val_loader = torch.utils.data.DataLoader(val_set, batch_size=Config.batch_size, shuffle=True, num_workers=4)
+    test_loader = torch.utils.data.DataLoader(test_set, batch_size=Config.batch_size, shuffle=True, num_workers=4)
+    
+    return train_loader, val_loader, test_loader
+

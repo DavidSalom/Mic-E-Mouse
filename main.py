@@ -1,42 +1,102 @@
 import torch
-import torch.nn as nn
-from torchinfo import summary
-from core.VCTK_dataloader import VCTK_Dataset
+import sys
+import wandb
 from tqdm import tqdm
-import matplotlib.pyplot as plt
-import os
-import hashlib
-from core.WaveUNet import *
-from einops import*
+import numpy as np
 import logging
 
-logging.basicConfig(level=logging.DEBUG)
 
-train_split = 0.9
-val_split = 0.05
-test_split = 0.05
-batch_size = 16
-resample_rate = 8000
-VCTK_root_path = "/media/data/VCTK-Corpus"
+from core.VCTK_dataloader import setup_dataset
+from core.WaveUNet import CrossAttentionWavUNet
+from config import Config
 
-DS = VCTK_Dataset.cache_constructor(VCTK_root_path, resample_rate=resample_rate)
-logging.info(f"Splitting the dataset into {train_split * 100}% training, {val_split * 100}% validation, and {test_split * 100}% test sets.")
-N_train = int(len(DS) * train_split)
-N_val = int(len(DS) * val_split)
-N_test = len(DS) - N_train - N_val
-logging.info(f"Number of training samples: {N_train}; number of validation samples: {N_val}; number of test samples: {N_test}.")
-# Split the dataset into training, validation, and test sets
-train_set, val_set, test_set = torch.utils.data.random_split(DS, [N_train, N_val, N_test], generator=torch.Generator().manual_seed(42))
-# Create data loaders
-train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=4)
-val_loader = torch.utils.data.DataLoader(val_set, batch_size=batch_size, shuffle=True, num_workers=4)
-test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=True, num_workers=4)
+# Parse arguments
+cfg = Config(sys.argv[1:])
 
-def compute_statistics_hardcoded():
-    val = torch.concatenate([X for X, _ in val_loader], dim=0)
-    val = ( val - val.mean(dim=-1, keepdim=True) ) / val.std(dim=-1, keepdim=True)
-    clip_max = val.max(dim = -1)[0].quantile(0.95)
-    clip_min = val.min(dim = -1)[0].quantile(0.05)
-    # val = torch.clip(val, clip_min, clip_max)
-    # val = 2 * (val - clip_min) / (clip_max - clip_min) - 1
-    return clip_min, clip_max
+# Setup logging
+logging_level = logging.ERROR if cfg.silent else  (logging.DEBUG if cfg.debug else logging.INFO) 
+logging.basicConfig(level=logging_level, format='%(asctime)s %(levelname)s %(message)s')
+
+# Setup dataset
+train_loader, val_loader, test_loader = setup_dataset(cfg)
+
+# Setup wandb
+if cfg.wandb:
+    wandb.init(
+        project="MicEMouse",
+        config = {
+            "dataset": "VCTK",
+            "resample_rate": cfg.resample_rate,
+            "batch_size": cfg.batch_size,
+            "train_split": cfg.train_split,
+            "val_split": cfg.val_split,
+            "test_split": cfg.test_split,
+            "quantile": 0.95,
+            "seed": cfg.seed,
+            "N_diffusion": cfg.N_diffusion,
+            "beta_min": cfg.beta_min,
+            "beta_max": cfg.beta_max,
+            "beta_dist": "uniform",
+            "learning_rate": cfg.learning_rate,
+        },
+    )
+
+# Setup model
+net = CrossAttentionWavUNet().to(cfg.device)
+opt = torch.optim.Adam(net.parameters(), lr=cfg.learning_rate)
+
+# Setup Diffusion
+betas = torch.linspace(cfg.beta_min, cfg.beta_max, cfg.N_diffusion, device=cfg.device)
+alphas = 1 - betas
+alphas_cumprod = torch.cumprod(alphas, dim=0)
+x0_weight = torch.sqrt(alphas_cumprod)
+eps_weight = torch.sqrt(1 - alphas_cumprod)
+sampling_weight_0 = 1/(torch.sqrt(alphas))
+sampling_weight_1 = (1 - alphas)/(torch.sqrt(1 - alphas_cumprod))
+sigmas = torch.sqrt(betas)
+
+if cfg.validation:
+    loader = val_loader
+else:
+    loader = train_loader
+if not cfg.silent:
+    pbar = tqdm(total=cfg.epochs)
+epoch_losses = []
+for epoch in range(cfg.epochs):
+    losses = []
+    windowed_losses = []
+    i = 0
+    N = len(loader)
+    for x, _ in loader:
+        x = x.to(cfg.device)
+        b, _, _ = x.shape
+        t = torch.randint(0, cfg.N_diffusion, (b,), device=cfg.device)
+        eps = torch.randn_like(x, device=cfg.device)
+        X = x0_weight[t].unsqueeze(-1).unsqueeze(-1) * x + (1 - x0_weight[t]).unsqueeze(-1).unsqueeze(-1) * eps
+        eps_pred = net(X, t.unsqueeze(-1))
+        loss = torch.mean((eps_pred - eps)**2)
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+        i += 1
+        losses.append(loss.item())
+    
+        if not cfg.silent:
+            pbar.set_description(f"Epoch {epoch + 1} Batch {i}/{N} loss: {loss.item():.4f}")
+    
+        if cfg.wandb:
+            wandb.log({"loss": loss.item()})
+            
+    if cfg.wandb:
+        wandb.log({"epoch_loss": np.mean(losses)})
+        
+    if not cfg.silent:
+        pbar.update(1)
+        
+    epoch_losses.append(np.mean(losses))
+    
+if not cfg.silent:
+    pbar.close()
+if cfg.wandb:
+    wandb.finish()
+    
