@@ -94,7 +94,10 @@ for epoch in range(cfg.epochs):
         pbar.update(1)
         
     epoch_losses.append(np.mean(losses))
-    
+
+# Save model
+torch.save(net.state_dict(), f"{cfg.save_path}/model.pt")
+
 if not cfg.silent:
     pbar.close()
 if cfg.wandb:
