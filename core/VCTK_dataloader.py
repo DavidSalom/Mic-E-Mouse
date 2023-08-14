@@ -51,7 +51,7 @@ class VCTK_Dataset(Dataset, CacheMixin):
         """
         Initialize the dataset by loading all wav file paths and building the index-to-wav-offset dictionary.
         """
-        self.wav_files_paths = glob.glob(os.path.join(self.VCTK_root_path, 'wav48', '*', '*.wav'))
+        self.wav_files_paths = glob.glob(os.path.join(self.VCTK_root_path, 'wav48_silence_trimmed', '*', '*.wav'))
         self.idx_to_wav_offset_dict = {}
         self._build_idx_to_wav_dict()
 
@@ -125,18 +125,18 @@ class VCTK_Dataset(Dataset, CacheMixin):
         wav_file_path = self.wav_files_paths[wav_idx] # wav file path
         
         waveform, sample_rate = self._load_audio(wav_file_path)
-        waveform = self._normalize(waveform)
         waveform = waveform[:, wav_offset*sample_rate:(wav_offset+1)*sample_rate]
         waveform, sample_rate = self._resample(waveform, sample_rate, self.resample_rate)
 
         if waveform.shape[1] < sample_rate:
-            waveform = torch.nn.functional.pad(waveform, (0, sample_rate - waveform.shape[1]))    
+            waveform = torch.nn.functional.pad(waveform, (0, sample_rate - waveform.shape[1]))  
+              
+        # Normalize
+        waveform = self._normalize(waveform)
         
-        # Normalize to zero mean and unit variance
-        waveform = (waveform - waveform.mean())/waveform.std()
         # Clip to computed min and max
         waveform = torch.clip(waveform, self.clip_min, self.clip_max)
-        # Normalize to [-1, 1]
+        # Rescale to [-1, 1]
         waveform = 2 * (waveform - self.clip_min) / (self.clip_max - self.clip_min) - 1
         
         return waveform, sample_rate

@@ -4,6 +4,7 @@ import wandb
 from tqdm import tqdm
 import numpy as np
 import logging
+import diffusers.schedulers
 
 
 from core.VCTK_dataloader import setup_dataset
@@ -36,24 +37,26 @@ if cfg.wandb:
             "N_diffusion": cfg.N_diffusion,
             "beta_min": cfg.beta_min,
             "beta_max": cfg.beta_max,
+            "scheduler": cfg.scheduler,
             "beta_dist": "uniform",
             "learning_rate": cfg.learning_rate,
+            "resumed": cfg.load_path is not None,
         },
     )
+    
+scheduler = diffusers.schedulers.__getattribute__(cfg.scheduler)(beta_start = cfg.beta_min, beta_end = cfg.beta_max, num_train_timesteps = cfg.N_diffusion)
 
 # Setup model
 net = CrossAttentionWavUNet().to(cfg.device)
+if cfg.load_path is not None:
+    net.load_state_dict(torch.load(cfg.load_path))
 opt = torch.optim.Adam(net.parameters(), lr=cfg.learning_rate)
 
-# Setup Diffusion
-betas = torch.linspace(cfg.beta_min, cfg.beta_max, cfg.N_diffusion, device=cfg.device)
-alphas = 1 - betas
-alphas_cumprod = torch.cumprod(alphas, dim=0)
-x0_weight = torch.sqrt(alphas_cumprod)
-eps_weight = torch.sqrt(1 - alphas_cumprod)
-sampling_weight_0 = 1/(torch.sqrt(alphas))
-sampling_weight_1 = (1 - alphas)/(torch.sqrt(1 - alphas_cumprod))
-sigmas = torch.sqrt(betas)
+for param in net.parameters():
+    param.requires_grad = False
+
+for param in net.out_res_conv.parameters():
+    param.requires_grad = True
 
 if cfg.validation:
     loader = val_loader
@@ -72,7 +75,7 @@ for epoch in range(cfg.epochs):
         b, _, _ = x.shape
         t = torch.randint(0, cfg.N_diffusion, (b,), device=cfg.device)
         eps = torch.randn_like(x, device=cfg.device)
-        X = x0_weight[t].unsqueeze(-1).unsqueeze(-1) * x + (1 - x0_weight[t]).unsqueeze(-1).unsqueeze(-1) * eps
+        X = scheduler.add_noise(x, eps, t)
         eps_pred = net(X, t.unsqueeze(-1))
         loss = torch.mean((eps_pred - eps)**2)
         opt.zero_grad()

@@ -11,7 +11,7 @@ class ConvResidual(nn.Module):
     """
     in -> Residual(conv, bn, gelu, conv), bn, conv, gelu, bn -> out
     """
-    def __init__(self, in_channels, out_channels, kernel_size = 15):
+    def __init__(self, in_channels, out_channels, kernel_size = 15, last = False):
         super(ConvResidual, self).__init__()
         self.net = nn.Sequential(
             Residual(
@@ -24,8 +24,8 @@ class ConvResidual(nn.Module):
             ),
             BatchNorm1d(in_channels),
             nn.Conv1d(in_channels, out_channels, kernel_size=kernel_size, stride=1, padding='same'),
-            nn.GELU(),
-            BatchNorm1d(out_channels)
+            nn.GELU() if not last else nn.Identity(),
+            BatchNorm1d(out_channels) if not last else nn.Identity()
         )
     
     def forward(self, x):
@@ -267,67 +267,78 @@ class TransformerBlock(nn.Module):
         return self.net(att)
     
 class CrossAttentionWavUNet(nn.Module):
-    def __init__(self, N_diffusion = 1000, conditional_dim = 32, out_dims = 1):
+    def __init__(self, N_diffusion = 1000, conditional_dim = 32, out_dims = 1, window_sizes = [None, 400, 400], channel_list = [8, 32, 64, 128, 256, 512]):
         super(CrossAttentionWavUNet, self).__init__()
         
-        self.in_res_conv = ConvResidual(1, 4, 15)
-        self.out_res_conv= ConvResidual(4, out_dims, 15)
+        self.dim_0 = channel_list[0]
+        self.dim_1 = channel_list[1]
+        self.dim_2 = channel_list[2]
+        
+        self.dim_3 = channel_list[3]
+        self.dim_4 = channel_list[4]
+        self.dim_5 = channel_list[5]
+        
+        self.in_res_conv = ConvResidual(1, self.dim_0, 15)
+        self.out_res_conv= ConvResidual(self.dim_0, out_dims, 15, last = True)
+        
+        self.channel_list = channel_list
+        
         
         self.out_dims = out_dims
         
         # (4, 8000)
         self.DC1 = nn.Sequential(
-            DownsampleBlock(4, 16),
-            DownsampleBlock(16, 32)
+            DownsampleBlock(self.dim_0, self.dim_1),
+            DownsampleBlock(self.dim_1, self.dim_2)
         )
         # (32, 2000)
         self.DC2 = nn.Sequential(
-            DownsampleBlock(32, 64, 9),
-            DownsampleBlock(64, 128, 9)
+            DownsampleBlock(self.dim_2, self.dim_3, 9),
+            DownsampleBlock(self.dim_3, self.dim_4, 9)
         )
         # (128, 500)
-        self.DC3 = DownsampleBlock(128, 256, 5)
+        self.DC3 = DownsampleBlock(self.dim_4, self.dim_5, 5)
         # (256, 250)
         
-        self.selfAttention = TransformerBlock(256, 4)
-        
-        self.Windowed_Cross_Attention_3 = TransformerBlock(128, 4, 0.1, 50)
-        self.Windowed_Cross_Attention_2 = TransformerBlock(32, 4, 0.1, 200)
-        self.Windowed_Cross_Attention_1 = TransformerBlock(4, 4, 0.1, 400)
+        self.selfAttention = TransformerBlock(self.dim_5, 4)
+        self.window_sizes = window_sizes
+        self.Windowed_Cross_Attention_3 = TransformerBlock(self.dim_4, 4, 0.1, self.window_sizes[0])
+        self.Windowed_Cross_Attention_2 = TransformerBlock(self.dim_2, 4, 0.1, self.window_sizes[1])
+        self.Windowed_Cross_Attention_1 = TransformerBlock(self.dim_0, 4, 0.1, self.window_sizes[2])
         
         if conditional_dim is not None:
-            self.c_to_1 = nn.Linear(conditional_dim, 4)
-            self.c_to_2 = nn.Linear(conditional_dim, 32)
-            self.c_to_3 = nn.Linear(conditional_dim, 128)
-            self.c_to_self = nn.Linear(conditional_dim, 256)
+            self.c_to_1 = nn.Linear(conditional_dim, self.dim_0)
+            self.c_to_2 = nn.Linear(conditional_dim, self.dim_2)
+            self.c_to_3 = nn.Linear(conditional_dim, self.dim_4)
+            self.c_to_self = nn.Linear(conditional_dim, self.dim_5)
         
-        self.US3 = UpSampleBlock(256, 128, 5)
+        self.US3 = UpSampleBlock(self.dim_5, self.dim_4, 5)
         
         self.US2 = nn.Sequential(
-            UpSampleBlock(128, 64, 9),
-            UpSampleBlock(64, 32, 9)
+            UpSampleBlock(self.dim_4, self.dim_3, 9),
+            UpSampleBlock(self.dim_3, self.dim_2, 9)
         )
         
         self.US1 = nn.Sequential(
-            UpSampleBlock(32, 16), 
-            UpSampleBlock(16, 4)
+            UpSampleBlock(self.dim_2, self.dim_1), 
+            UpSampleBlock(self.dim_1, self.dim_0)
         )
         
-        self.waveform_time_embedding_q_1 = nn.Parameter(torch.randn(8000, 4))
-        self.waveform_time_embedding_q_2 = nn.Parameter(torch.randn(2000, 32))
-        self.waveform_time_embedding_q_3 = nn.Parameter(torch.randn(500, 128))
+        self.waveform_time_embedding_q_1 = nn.Parameter(torch.randn(8000, self.dim_0))
+        self.waveform_time_embedding_q_2 = nn.Parameter(torch.randn(2000, self.dim_2))
+        self.waveform_time_embedding_q_3 = nn.Parameter(torch.randn(500, self.dim_4))
         
-        self.waveform_time_embedding_q_self = nn.Parameter(torch.randn(250, 256))
+        self.waveform_time_embedding_q_self = nn.Parameter(torch.randn(250, self.dim_5))
         
-        self.waveform_time_embedding_kv_1 = nn.Parameter(torch.randn(8000, 4))
-        self.waveform_time_embedding_kv_2 = nn.Parameter(torch.randn(2000, 32))
-        self.waveform_time_embedding_kv_3 = nn.Parameter(torch.randn(500, 128))
+        self.waveform_time_embedding_kv_1 = nn.Parameter(torch.randn(8000, self.dim_0))
+        self.waveform_time_embedding_kv_2 = nn.Parameter(torch.randn(2000, self.dim_2))
+        self.waveform_time_embedding_kv_3 = nn.Parameter(torch.randn(500, self.dim_4))
         
-        self.diffusion_time_embedding_1 = nn.Embedding(N_diffusion, 4)
-        self.diffusion_time_embedding_2 = nn.Embedding(N_diffusion, 32)
-        self.diffusion_time_embedding_3 = nn.Embedding(N_diffusion, 128)
+        self.diffusion_time_embedding_1 = nn.Embedding(N_diffusion, self.dim_0)
+        self.diffusion_time_embedding_2 = nn.Embedding(N_diffusion, self.dim_2)
+        self.diffusion_time_embedding_3 = nn.Embedding(N_diffusion, self.dim_4)
         
-        self.diffusion_time_embedding_self = nn.Embedding(N_diffusion, 256)
+        self.diffusion_time_embedding_self = nn.Embedding(N_diffusion, self.dim_5)
     
     
     def forward(self, x, t, c = None):
