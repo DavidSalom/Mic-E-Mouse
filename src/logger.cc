@@ -61,6 +61,10 @@ buffer_t* B = new buffer_t();
 bool* running = new bool(true);
 
 void collector_thread(){
+
+    system("cat /proc/bus/input/devices | grep -A5 -ne \"\\\"Razer Razer Viper 8KHz\\\"\" | sed '/Handlers=.* mouse[0-9]/!d' | sed -E 's/(.*)(mouse.*)/\\2/g'");
+
+
     mouse_t mouse = mouse_t("/dev/input/mouse0");
     stopwatch_t stopwatch = stopwatch_t();
     buffer_t* buffer = A;
@@ -96,7 +100,7 @@ void archiver_thread(){
     char* date = new char[80];
     strftime(date, 80, "%Y-%m-%d_%H-%M-%S", ltm);
     char* filename = new char[80];
-    sprintf(filename, "../data/data_%s.csv", date);
+    sprintf(filename, "./data/data_%s.csv", date);
     file_handler file = file_handler(filename);
     buffer_t* buffer = A;
     buffer_t* otherBuffer = B;
