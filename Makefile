@@ -1,18 +1,44 @@
-CXX = g++
-CXXFLAGS = -std=c++20
-COMMONFILES = common.cpp
-COMMONHEADERS = common.h
-LOGGERFILES = logger.cpp
+CX=clang++
+C=clang
+LD=-fuse-ld=mold
+CFLAGS=--std=c++20 -Og -g -Wall -Wextra -Wno-format -Wno-write-strings
 
-all: mouse_logger
+PREREQ_DIR=@mkdir -p $(@D)
 
-default: mouse_logger
+SRCDIR=src
+BUILDDIR=build
+BINDIR=bin
 
-common.o: $(COMMONFILES) $(COMMONHEADERS)
-	$(CXX) $(CXXFLAGS) -c $(COMMONFILES) -o common.o
+NAME=$(addprefix $(BINDIR)/, mouse_logger)
 
-mouse_logger: $(LOGGERFILES) common.o
-	$(CXX) $(CXXFLAGS) $(LOGGERFILES) common.o -o mouse_logger
+SRCS=$(wildcard $(SRCDIR)/*.cc)#$(wildcard $(SRCDIR)/*/*.cc)
+OBJS=$(patsubst $(SRCDIR)/%.cc, $(BUILDDIR)/%.o, $(SRCS))
+
+all:
+	@$(MAKE) --no-print-directory $(NAME)
+
+re: clean
+	@$(MAKE) --no-print-directory
+
+$(NAME): $(OBJS) | $(@D)
+	$(PREREQ_DIR)
+	$(CXX) $(CFLAGS) -o $(NAME) $(OBJS) $(LFLAGS)
+
+$(OBJS): $(BUILDDIR)/%.o: $(SRCDIR)/%.cc
+	$(PREREQ_DIR)
+	$(CXX) $(CFLAGS) -o $@ -c $<
 
 clean:
-	rm -f *.o mouse_logger data.txt
+	@echo
+	@echo "cleaning old build files"
+	@echo
+	@$(MAKE) --no-print-directory cleanbuild
+	@$(MAKE) --no-print-directory cleanexec
+
+cleanbuild:
+	rm -f build/*.o
+
+cleanexec:
+	rm -f $(NAME)
+
+.PHONY: all clean
