@@ -4,3 +4,4 @@ raw_data/*
 local_*.ipynb
 .cache/*
 wandb/*
+.ipynb_checkpoints/*
