@@ -128,6 +128,9 @@ void archiver_thread(){
     buffer_t* otherBuffer = B;
     buffer_t* temp;
     char* str = new char[BUFFER_SIZE * 300];
+
+    file.write("offset, x, y\n");
+
     while(*running){
         printf("[ARCHIVER]: Waiting for buffer to fill...\n");
         buffer->wait();
