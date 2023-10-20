@@ -15,7 +15,7 @@ percentBar ()  {
 }
 
 IFS=$'\n'
-list_flac=($(find stock/wav48_silence_trimmed -iname 'p2[0-3][0-9]*.flac'))
+list_flac=($(find stock/wav48_silence_trimmed -iname 'p2[0-4][0-9]*mic2.flac'))
 unset IFS
 
 
@@ -25,7 +25,7 @@ n_comp=0.0
 
 #n_flac=$(echo "$list_flac" | wc -l)
 
-#total_time=0
+total_time=0
 
 for item in ${list_flac[@]}
 do
@@ -51,6 +51,8 @@ do
 
   percentBar $v4 $COLUMNS bar1
   echo "$bar1"
+
+  #continue
 
 
   #// TODO: actually implement recording
