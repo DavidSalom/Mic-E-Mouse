@@ -12,7 +12,7 @@ def loadData(src: str) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     :return: A Tuple containing the time vector, the nonuniform X vector, and the nonuniform Y vector.
     """
     # Load the data from the source file
-    data = np.loadtxt(src, delimiter=',')
+    data = np.loadtxt(src, delimiter=',',skiprows=1,dtype=int)
     # Convert the data into a PyTorch tensor
     data = torch.from_numpy(data)
 
@@ -23,7 +23,7 @@ def loadData(src: str) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     
     return T, nonuniformX, nonuniformY
 
-def resample(T : torch.Tensor, nuX : torch.Tensor, nuY : torch.Tensor, Fs : int = 16000, cubic : bool = True) -> Tuple(torch.Tensor, torch.Tensor, torch.Tensor):
+def resample(T : torch.Tensor, nuX : torch.Tensor, nuY : torch.Tensor, Fs : int = 16000, cubic : bool = True) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Resample the signal to uniformize the sampling rate through interpolating the data using cubic or linear interpolation.
     :param T: The time vector.
