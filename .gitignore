@@ -5,3 +5,4 @@ local_*.ipynb
 .cache/*
 wandb/*
 .ipynb_checkpoints/*
+.ipynb_checkpoints/
