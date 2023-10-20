@@ -20,6 +20,9 @@
 #define COLLECTION_TIME 5
 #define BUFFER_SIZE (SAMPLE_RATE * COLLECTION_TIME)
 
+
+static std::string cli_filename = "";
+
 struct buffer_t{
     entry_t* buffer = new entry_t[BUFFER_SIZE];
     int head = 0;
@@ -119,10 +122,17 @@ void archiver_thread(){
     // Get current date and time as string
     time_t now = time(0);
     tm* ltm = localtime(&now);
-    char* date = new char[80];
-    strftime(date, 80, "%Y-%m-%d_%H-%M-%S", ltm);
-    char* filename = new char[80];
-    sprintf(filename, "./data/data_%s.csv", date);
+    char* date = new char[180];
+    strftime(date, 180, "%Y-%m-%d_%H-%M-%S", ltm);
+    char* filename = new char[180];
+
+    if (cli_filename == "") {
+      sprintf(filename, "./data/data_%s.csv", date);
+    }
+    else {
+      sprintf(filename, cli_filename.c_str(), date);
+    }
+
     file_handler file = file_handler(filename);
     buffer_t* buffer = A;
     buffer_t* otherBuffer = B;
@@ -152,9 +162,14 @@ void archiver_thread(){
     delete[] str;
 }
 
-int main() {
+int main(int argc, char** argv) {
 
     signal(SIGINT, interrupt_handler);
+
+    if (argc == 2) {
+      cli_filename = argv[1];
+      printf("using %s as CSV output path\n", cli_filename.c_str());
+    }
 
     std::thread collector(collector_thread);
     std::thread archiver(archiver_thread);

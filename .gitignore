@@ -6,6 +6,6 @@ local_*.ipynb
 wandb/*
 .ipynb_checkpoints/*
 .ipynb_checkpoints/
+build/*.o
 
-vctk/gen
 vctk/stock
