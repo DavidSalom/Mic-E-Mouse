@@ -6,8 +6,11 @@
 #include <time.h>
 #include <sys/time.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
+#include <string>
 #include <thread>
+#include <algorithm>
 #include <mutex>
 #include <condition_variable>
 #include "common.h"
@@ -62,10 +65,29 @@ bool* running = new bool(true);
 
 void collector_thread(){
 
-    system("cat /proc/bus/input/devices | grep -A5 -ne \"\\\"Razer Razer Viper 8KHz\\\"\" | sed '/Handlers=.* mouse[0-9]/!d' | sed -E 's/(.*)(mouse.*)/\\2/g'");
+    const std::string mouse_cmd = "cat /proc/bus/input/devices | grep -A5 -ne \"\\\"Razer Razer Viper 8KHz\\\"\" | sed '/Handlers=.* mouse[0-9]/!d' | sed -E 's/(.*)(mouse.*)/\\2/g'";
+
+    char buffer_cmd[128];
+    std::string mouse_device = "";
+    FILE* pipe = popen(mouse_cmd.c_str(), "r");
+    while (fgets(buffer_cmd, sizeof buffer_cmd, pipe) != NULL) {
+        mouse_device += buffer_cmd;
+    }
+    pclose(pipe);
 
 
-    mouse_t mouse = mouse_t("/dev/input/mouse0");
+    if (mouse_device == "") {
+      printf("valid mouse not found, plug it in and try again\n");
+      exit(1);
+    }
+    else {
+      mouse_device = "/dev/input/" + mouse_device;
+      mouse_device.erase(std::remove(mouse_device.begin(), mouse_device.end(), '\n'), mouse_device.cend());
+      mouse_device.erase(std::remove(mouse_device.begin(), mouse_device.end(), ' '), mouse_device.cend());
+      printf("using device: %s\n", mouse_device.c_str());
+    }
+
+    mouse_t mouse = mouse_t(const_cast<char*>(mouse_device.c_str()));
     stopwatch_t stopwatch = stopwatch_t();
     buffer_t* buffer = A;
     buffer_t* otherBuffer = B;
@@ -127,8 +149,7 @@ void archiver_thread(){
     delete[] str;
 }
 
-int main(int argc, char** argv)
-{
+int main() {
 
     signal(SIGINT, interrupt_handler);
 

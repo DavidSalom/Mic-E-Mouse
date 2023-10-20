@@ -1,7 +1,7 @@
 CX=clang++
 C=clang
 LD=-fuse-ld=mold
-CFLAGS=--std=c++20 -Og -g -Wall -Wextra -Wno-format -Wno-write-strings
+CFLAGS=--std=c++20 -Ofast -Wall -Wextra -Wno-format -Wno-write-strings
 
 PREREQ_DIR=@mkdir -p $(@D)
 
