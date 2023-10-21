@@ -1,6 +1,13 @@
 #!/bin/zsh
 
 #if [[ ! $(sudo echo 0) ]]; then exit; fi
+pid_log=0
+
+sigint_handler()
+{
+    kill -s SIGINT $pid_log
+    exit
+}
 
 percentBar ()  { 
     local prct totlen=$((8*$2)) lastchar barstring blankstring;
@@ -74,13 +81,15 @@ do
   #
   cd ..
 
-  out_csv=$(echo $item | sed 's/^stock/gen\/csv/')
+  out_csv=$(echo $item | sed 's/^stock/gen\/csv/' | sed 's/\.flac$/.csv/')
   mkdir -p $(dirname "vctk/$out_csv")
 
   # extra 0.25ms is roughly the startup delay for the flac player
   timeout_length=$(echo "$item_length + 2.00025" | bc -l)
 
-  #timeout -s INT $timeout_length sudo ./bin/mouse_logger "vctk/$out_csv" & pid_log=$(echo $!)
+  
+  trap sigint_handler SIGINT
+  timeout -s INT $timeout_length sudo ./bin/mouse_logger "vctk/$out_csv" & pid_log=$(echo $!)
   #SECONDS=0
 
 
@@ -96,7 +105,7 @@ do
   #echo $SECONDS
 
   wait $pid_flac
-  #wait $pid_log
+  wait $pid_log
 
   cd vctk
 done
