@@ -52,7 +52,10 @@ do
   percentBar $v4 $COLUMNS bar1
   echo "$bar1"
 
+  typeset -F SECONDS=0
+
   #continue
+  #
 
 
   #// TODO: actually implement recording
@@ -70,33 +73,36 @@ do
   # repeat for all files
   #
   # TODO: do we need microphone, if so, we can just arecord [device] [path] with same structure as CSV directories
- 
-
-  # TODO: ENABLE MOUSE_LOGGER WITH PATH SUPPORT (via. argv)
   #
   cd ..
 
   out_csv=$(echo $item | sed 's/^stock/gen\/csv/')
   mkdir -p $(dirname "vctk/$out_csv")
 
-  timeout_length=$(echo "$item_length + 2.0" | bc -l)
+  timeout_length=$(echo "$item_length + 2.00025" | bc -l)
 
   #TODO: mouse_logger does not write to file until ANOTHER mouse interrupt occurs, needs to be fixed
   #timeout -s INT $timeout_length sudo ./bin/mouse_logger "vctk/$out_csv" & pid_log=$(echo $!)
+  #SECONDS=0
 
 
  
 
   sleep 1
+  
+  #echo $SECONDS
 
   # TODO: find the device ID of the speaker when plugged int
-  #flac -c -d "vctk/$item" | aplay & pid_flac=$(echo $!)
+  flac -c -d -s "vctk/$item" | aplay -q & pid_flac=$(echo $!)
+
+  #echo $SECONDS
 
   #wait $pid_flac
   #wait $log_flac
 
   
 
+  #sleep 10
 
 
   cd vctk
