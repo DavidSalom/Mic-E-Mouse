@@ -33,6 +33,8 @@ n_comp=0.0
 #n_flac=$(echo "$list_flac" | wc -l)
 
 total_time=0
+unint_time=0
+max_unint_time=14400
 
 for item in ${list_flac[@]}
 do
@@ -52,6 +54,12 @@ do
 
   echo "len : $item_length"
 
+  timeout_length=$(echo "$item_length + 2.00025" | bc -l)
+  
+  unint_time=$(echo "$unint_time + $timeout_length" | bc -l)
+
+  echo "uninterrupted time (max $max_unint_time): $unint_time"
+
   #total_time=$(echo "$total_time + $item_length" | bc -l)
   #echo $total_time
 
@@ -61,6 +69,20 @@ do
 
   typeset -F SECONDS=0
 
+
+  if ((unint_time>max_unint_time))
+  then
+    echo "$max_unint_time seconds have passed, taking a 30 minute break"
+
+    unint_time=0
+
+    seconds=1800
+    start="$(($(date +%s) + $seconds))"
+    while [ "$start" -ge `date +%s` ]; do
+        time="$(( $start - `date +%s` ))"
+        printf '%s\r' "$(date -u -d "@$time" +%M:%S)"
+    done
+  fi
   #continue
   #
 
@@ -85,7 +107,7 @@ do
   mkdir -p $(dirname "vctk/$out_csv")
 
   # extra 0.25ms is roughly the startup delay for the flac player
-  timeout_length=$(echo "$item_length + 2.00025" | bc -l)
+
 
   
   trap sigint_handler SIGINT
