@@ -63,6 +63,11 @@ int mouse_t::getData() {
     return bytes;
 }
 
+void mouse_t::endData() {
+  mouse_data_t m_data = {0,0,0};
+  write(fd, &m_data, sizeof(m_data));
+}
+
 char* mouse_t::toString(){
     char* str = (char*)malloc(300);
     sprintf(str, "%d, %d, %d, %d, %d\n", x, y, left, middle, right);

@@ -41,6 +41,7 @@ class mouse_t { // mouse wrapper class, used for interfacing with the mouse devi
         mouse_t(char* pDevice = "/dev/input/mice");
         ~mouse_t();
         int getData();
+        void endData();
         char* toString() ;
         void toJSON(char* str);
         void center();

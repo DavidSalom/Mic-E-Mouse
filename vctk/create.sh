@@ -57,8 +57,6 @@ do
   #continue
   #
 
-
-  #// TODO: actually implement recording
   #NOTE: TIMELINE:
   # 1 second: turn on mouse_logger, let values settle 
   #   | timestamp recorded by program, will be used later
@@ -79,9 +77,9 @@ do
   out_csv=$(echo $item | sed 's/^stock/gen\/csv/')
   mkdir -p $(dirname "vctk/$out_csv")
 
+  # extra 0.25ms is roughly the startup delay for the flac player
   timeout_length=$(echo "$item_length + 2.00025" | bc -l)
 
-  #TODO: mouse_logger does not write to file until ANOTHER mouse interrupt occurs, needs to be fixed
   #timeout -s INT $timeout_length sudo ./bin/mouse_logger "vctk/$out_csv" & pid_log=$(echo $!)
   #SECONDS=0
 
@@ -97,17 +95,10 @@ do
 
   #echo $SECONDS
 
-  #wait $pid_flac
-  #wait $log_flac
-
-  
-
-  #sleep 10
-
+  wait $pid_flac
+  #wait $pid_log
 
   cd vctk
-
-  #echo $n_comp
 done
 
 #echo "total_time: $total_time seconds"

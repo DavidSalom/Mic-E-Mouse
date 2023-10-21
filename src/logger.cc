@@ -22,6 +22,7 @@
 
 
 static std::string cli_filename = "";
+static mouse_t* global_mouse = nullptr;
 
 struct buffer_t{
     entry_t* buffer = new entry_t[BUFFER_SIZE];
@@ -91,6 +92,7 @@ void collector_thread(){
     }
 
     mouse_t mouse = mouse_t(const_cast<char*>(mouse_device.c_str()));
+    global_mouse = &mouse;
     stopwatch_t stopwatch = stopwatch_t();
     buffer_t* buffer = A;
     buffer_t* otherBuffer = B;
@@ -175,8 +177,11 @@ int main(int argc, char** argv) {
     std::thread archiver(archiver_thread);
 
     printf("Executing...\n");
-    collector.join();
     archiver.join();
+   
+    global_mouse->endData();
+
+    collector.join();
 
     printf("Exiting...\n");
     return 0; 
