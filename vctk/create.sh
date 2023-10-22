@@ -1,7 +1,11 @@
 #!/bin/zsh
 
 #if [[ ! $(sudo echo 0) ]]; then exit; fi
+
 pid_log=0
+
+
+export TERMINFO=/usr/share/terminfo
 
 sigint_handler()
 {
@@ -34,11 +38,13 @@ n_comp=0.0
 
 total_time=0
 unint_time=0
-max_unint_time=14400
+max_unint_time=3600
 
 for item in ${list_flac[@]}
 do
   let "n_comp++"
+
+  sudo true
 
 
   pc=$(echo "$n_comp/$n_flac" | bc -l)
@@ -76,10 +82,11 @@ do
 
     unint_time=0
 
-    seconds=1800
+    seconds=300
     start="$(($(date +%s) + $seconds))"
     while [ "$start" -ge `date +%s` ]; do
         time="$(( $start - `date +%s` ))"
+        sudo true
         printf '%s\r' "$(date -u -d "@$time" +%M:%S)"
     done
   fi
