@@ -14,6 +14,6 @@ The conda/mamba environment can be installed with the following command: `conda 
 ## Repository Structure
 ## Authors
 - [Mohamad Fakih]() - PhD Student, EECS, University of California Irvine
-- [Rahul Dharmaji](iika.re) - MS Student, EECS, University of California Irvine
+- [Rahul Dharmaji](https://iika.re) - MS Student, EECS, University of California Irvine
 - [Mohammad Abdullah Al Faruque](https://aicps.eng.uci.edu/) - Professor, EECS, University of California Irvine
 ## Citation
