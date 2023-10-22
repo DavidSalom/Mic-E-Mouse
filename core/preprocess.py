@@ -47,6 +47,7 @@ def resample(T : torch.Tensor, nuX : torch.Tensor, nuY : torch.Tensor, Fs : int 
     X = torch.zeros_like(Tperiodic)
     Y = torch.zeros_like(Tperiodic)
     # Iterate over time
+    curr_ind = 0
     for i in tqdm(range(1, len(Tperiodic))):
         while True:
             if Tcumul[curr_ind] < Tperiodic[i] * 1e6 <= Tcumul[curr_ind+1]:
