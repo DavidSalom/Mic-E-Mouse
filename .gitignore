@@ -10,4 +10,5 @@ build/*.o
 build/
 
 vctk/stock
+vctk/gen
 data/
