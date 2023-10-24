@@ -1,44 +1,12 @@
-CX=clang++
-C=clang
-LD=-fuse-ld=mold
-CFLAGS=--std=c++20 -Ofast -Wall -Wextra -Wno-format -Wno-write-strings
-
-PREREQ_DIR=@mkdir -p $(@D)
-
-SRCDIR=src
-BUILDDIR=build
-BINDIR=bin
-
-NAME=$(addprefix $(BINDIR)/, mouse_logger)
-
-SRCS=$(wildcard $(SRCDIR)/*.cc)#$(wildcard $(SRCDIR)/*/*.cc)
-OBJS=$(patsubst $(SRCDIR)/%.cc, $(BUILDDIR)/%.o, $(SRCS))
+# find all Makefile ./src/*/Makefile
+PROJECTS=$(shell find src/ -name Makefile -type f -printf '%h\n' | sort -u)
 
 all:
-	@$(MAKE) --no-print-directory $(NAME)
-
-re: clean
-	@$(MAKE) --no-print-directory
-
-$(NAME): $(OBJS) | $(@D)
-	$(PREREQ_DIR)
-	$(CXX) $(CFLAGS) -o $(NAME) $(OBJS) $(LFLAGS)
-
-$(OBJS): $(BUILDDIR)/%.o: $(SRCDIR)/%.cc
-	$(PREREQ_DIR)
-	$(CXX) $(CFLAGS) -o $@ -c $<
+	@for project in $(PROJECTS); do \
+		$(MAKE) --no-print-directory -C $$project; \
+	done
 
 clean:
-	@echo
-	@echo "cleaning old build files"
-	@echo
-	@$(MAKE) --no-print-directory cleanbuild
-	@$(MAKE) --no-print-directory cleanexec
-
-cleanbuild:
-	rm -f build/*.o
-
-cleanexec:
-	rm -f $(NAME)
-
-.PHONY: all clean
+	@for project in $(PROJECTS); do \
+		$(MAKE) --no-print-directory -C $$project clean; \
+	done
