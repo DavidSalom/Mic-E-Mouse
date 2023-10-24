@@ -44,30 +44,16 @@ def resample(T : torch.Tensor, nuX : torch.Tensor, nuY : torch.Tensor, Fs : int 
     numSamples = numSamples if maxTimesteps is None else min(numSamples, maxTimesteps)
     # Create a time vector
     Tperiodic = torch.linspace(0, TmaxSeconds, numSamples)
-    # Create X and Y vectors
-    X = torch.zeros_like(Tperiodic)
-    Y = torch.zeros_like(Tperiodic)
-    # Iterate over time
-    curr_ind = 0
-    for i in tqdm(range(1, len(Tperiodic))):
-        while True:
-            if Tcumul[curr_ind] < Tperiodic[i] * 1e6 <= Tcumul[curr_ind+1]:
-                weight = (Tperiodic[i] * 1e6 - Tcumul[curr_ind]) / (Tcumul[curr_ind+1] - Tcumul[curr_ind])
-                if resampleFn == "cubic":
-                    A = 2 * weight**3 - 3 * weight**2 + 1
-                    B = -2 * weight**3 + 3 * weight**2
-                elif resampleFn == "linear":
-                    A = 1 - weight
-                    B = weight
-                else:
-                    raise ValueError("Invalid resample function.")
-                X[i] = A * nuX[curr_ind] + B * nuX[curr_ind+1]
-                Y[i] = A * nuY[curr_ind] + B * nuY[curr_ind+1]
-                break
-            else:
-                curr_ind += 1
-                if curr_ind >= len(Tcumul) - 1:
-                    break
+    idxx = torch.searchsorted(Tcumul, Tperiodic * 1e6) - 1
+    W = ((Tperiodic * 1e6 - Tcumul[idxx])/(Tcumul[idxx + 1] - Tcumul[idxx]))
+    if resampleFn == "cubic":
+        W0 = 2 * W ** 3 - 3 * W ** 2 + 1
+        W1 = - 2 * W ** 3 + 3 * W ** 2
+    if resampleFn == "linear":
+        W0 = 1 - W
+        W1 = W
+    X = W0 * nuX[idxx] + W1 * nuX[idxx + 1]
+    Y = W0 * nuY[idxx] + W1 * nuY[idxx + 1]
     return Tperiodic, X, Y
 
 def project(X: torch.Tensor, Y: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
