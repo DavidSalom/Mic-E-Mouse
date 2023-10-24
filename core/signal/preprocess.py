@@ -23,7 +23,7 @@ def loadData(src: str) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     
     return T, nonuniformX, nonuniformY
 
-def resample(T : torch.Tensor, nuX : torch.Tensor, nuY : torch.Tensor, Fs : int = 16000, cubic : bool = True) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+def resample(T : torch.Tensor, nuX : torch.Tensor, nuY : torch.Tensor, Fs : int = 16000, resampleFn : str = "cubic", maxTimesteps : int = None) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Resample the signal to uniformize the sampling rate through interpolating the data using cubic or linear interpolation.
     :param T: The time vector.
@@ -41,6 +41,7 @@ def resample(T : torch.Tensor, nuX : torch.Tensor, nuY : torch.Tensor, Fs : int 
     TmaxSeconds = Tmax / 1e6
     # Number of samples at Fs
     numSamples = int(TmaxSeconds * Fs)
+    numSamples = numSamples if maxTimesteps is None else min(numSamples, maxTimesteps)
     # Create a time vector
     Tperiodic = torch.linspace(0, TmaxSeconds, numSamples)
     # Create X and Y vectors
@@ -52,12 +53,14 @@ def resample(T : torch.Tensor, nuX : torch.Tensor, nuY : torch.Tensor, Fs : int 
         while True:
             if Tcumul[curr_ind] < Tperiodic[i] * 1e6 <= Tcumul[curr_ind+1]:
                 weight = (Tperiodic[i] * 1e6 - Tcumul[curr_ind]) / (Tcumul[curr_ind+1] - Tcumul[curr_ind])
-                if cubic:
+                if resampleFn == "cubic":
                     A = 2 * weight**3 - 3 * weight**2 + 1
                     B = -2 * weight**3 + 3 * weight**2
-                else:
+                elif resampleFn == "linear":
                     A = 1 - weight
                     B = weight
+                else:
+                    raise ValueError("Invalid resample function.")
                 X[i] = A * nuX[curr_ind] + B * nuX[curr_ind+1]
                 Y[i] = A * nuY[curr_ind] + B * nuY[curr_ind+1]
                 break
@@ -142,11 +145,11 @@ def plotSpectrogram(X : torch.Tensor, Y : torch.Tensor, XOnly : bool = True, new
         # Show the figure
         plt.show()
 
-def processFromFile(fn):
+def processFromFile(fn, maxTimesteps = None, resampleFn = "cubic"):
     """
     Convenience function to load, resample, and project data from a file. This is the typical use case of the preprocessing pipeline.
     """
     nuT, nuX, nuY = loadData(fn)
-    T, X, Y = resample(nuT, nuX, nuY)
+    T, X, Y = resample(nuT, nuX, nuY, maxTimesteps=maxTimesteps, resampleFn=resampleFn)
     projX, projY = project(X, Y)
     return T, projX, projY
