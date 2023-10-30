@@ -8,6 +8,7 @@ wandb/*
 .ipynb_checkpoints/
 build/*
 
-vctk/stock
+vctk/VCTK-Corpus-0.92
+vctk/resampled
 vctk/gen
 data/

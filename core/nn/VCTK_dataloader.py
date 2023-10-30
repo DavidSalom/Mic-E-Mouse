@@ -40,7 +40,7 @@ class VCTK_Dataset(Dataset, CacheMixin):
         self.clip_min = clip_min
         self.clip_max = clip_max
         
-        self.resample_rate = kwargs.get('resample_rate', 8000)
+        self.resample_rate = kwargs.get('resample_rate', 16000)
 
     def _init_ds(self, other) -> None:
         self.VCTK_root_path = other.VCTK_root_path

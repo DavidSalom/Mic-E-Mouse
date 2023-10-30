@@ -131,11 +131,14 @@ def plotSpectrogram(X : torch.Tensor, Y : torch.Tensor, XOnly : bool = True, new
         # Show the figure
         plt.show()
 
-def processFromFile(fn, maxTimesteps = None, resampleFn = "cubic"):
+def processFromFile(fn, maxTimesteps = None, resampleFn = "cubic", skipPCA = False):
     """
     Convenience function to load, resample, and project data from a file. This is the typical use case of the preprocessing pipeline.
     """
     nuT, nuX, nuY = loadData(fn)
     T, X, Y = resample(nuT, nuX, nuY, maxTimesteps=maxTimesteps, resampleFn=resampleFn)
-    projX, projY = project(X, Y)
-    return T, projX, projY
+    if skipPCA:
+        return T, X, Y
+    else:
+        projX, projY = project(X, Y)
+        return T, projX, projY
