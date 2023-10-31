@@ -45,6 +45,9 @@ def resample(T : torch.Tensor, nuX : torch.Tensor, nuY : torch.Tensor, Fs : int 
     # Create a time vector
     Tperiodic = torch.linspace(0, TmaxSeconds, numSamples)
     idxx = torch.searchsorted(Tcumul, Tperiodic * 1e6) - 1
+    # idk why this is necessary but it is. TODO: investigate
+    idxx[idxx < 0] = 0
+    idxx[idxx > Tcumul.shape[0] - 2] = Tcumul.shape[0] - 2
     W = ((Tperiodic * 1e6 - Tcumul[idxx])/(Tcumul[idxx + 1] - Tcumul[idxx]))
     if resampleFn == "cubic":
         W0 = 2 * W ** 3 - 3 * W ** 2 + 1
