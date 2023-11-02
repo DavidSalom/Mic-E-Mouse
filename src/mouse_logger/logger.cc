@@ -1,5 +1,7 @@
 // #define RESET_FLAG 1
 
+#include <ostream>
+#include <random>
 #include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -11,12 +13,28 @@
 #include <string>
 #include <thread>
 #include <algorithm>
+#include <iostream>
 #include <mutex>
+#include <map>
 #include <condition_variable>
 #include "common.h"
 #include <signal.h>
 
-#define SAMPLE_RATE 8000
+enum class MOUSE_TYPE {
+  RAZER8KHZ,
+  G502,
+  NONE
+};
+
+static std::map<MOUSE_TYPE, int> poll_map = { 
+                                              {MOUSE_TYPE::RAZER8KHZ, 8000},
+                                              {MOUSE_TYPE::G502     , 1000},    
+                                            };
+
+static int SAMPLE_RATE = 8000;
+static MOUSE_TYPE m_type = MOUSE_TYPE::RAZER8KHZ;
+static std::string mouse_cmd;
+
 #define COLLECTION_TIME 5
 #define BUFFER_SIZE (SAMPLE_RATE * COLLECTION_TIME)
 
@@ -68,8 +86,6 @@ buffer_t* B = new buffer_t();
 bool* running = new bool(true);
 
 void collector_thread(){
-
-    const std::string mouse_cmd = "cat /proc/bus/input/devices | grep -A5 -ne \"\\\"Razer Razer Viper 8KHz\\\"\" | sed '/Handlers=.* mouse[0-9]/!d' | sed -E 's/(.*)(mouse.*)/\\2/g'";
 
     char buffer_cmd[128];
     std::string mouse_device = "";
@@ -128,7 +144,7 @@ void archiver_thread(){
     strftime(date, 180, "%Y-%m-%d_%H-%M-%S", ltm);
     char* filename = new char[180];
 
-    if (cli_filename == "") {
+    if (cli_filename == "" || cli_filename == "NULL") {
       sprintf(filename, "./data/data_%s.csv", date);
     }
     else {
@@ -166,12 +182,62 @@ void archiver_thread(){
 
 int main(int argc, char** argv) {
 
-    signal(SIGINT, interrupt_handler);
 
-    if (argc == 2) {
-      cli_filename = argv[1];
-      printf("using %s as CSV output path\n", cli_filename.c_str());
+    if (argc > 3) {
+      printf("too many arguments! (%s)", argc);
     }
+
+    if (argc == 3) {
+
+      int m_type_val = std::stoi(argv[2]);
+      //printf("%i: mtype\n", m_type_val);
+      m_type = static_cast<MOUSE_TYPE>(m_type_val);
+
+    }
+    else {
+      std::cout << "[0]: Razer (8KHz)" << std::endl;
+      std::cout << "[1]: G502  (1KHz)" << std::endl;
+      std::cout << "choose a mouse from the above selection: ";
+
+      int m_sel;
+      std::cin >> m_sel;
+
+      if (m_sel < 0 || m_sel > static_cast<int>(MOUSE_TYPE::NONE)) {
+        std::cout << "invalid mouse selection, exiting" << std::endl;
+        exit(1);
+      }
+
+      m_type = static_cast<MOUSE_TYPE>(m_sel);
+    }
+
+    auto g = poll_map.find(m_type);
+    //std::cout << static_cast<int>(g->first) << " " << g->second << std::endl; 
+    SAMPLE_RATE = g->second;
+
+
+    switch (m_type) {
+      using enum MOUSE_TYPE;
+      case RAZER8KHZ:
+        mouse_cmd = "cat /proc/bus/input/devices | grep -A5 -ne \"\\\"Razer Razer Viper 8KHz\\\"\" | sed '/Handlers=.* mouse[0-9]/!d' | sed -E 's/(.*)(mouse.*)/\\2/g'";
+        break;
+
+      case G502:
+        std::cerr << "UNIMPLEMENTED" << std::endl;
+        exit(1);
+        break;
+      default:
+        std::cerr << "bad mouse" << std::endl;
+        exit(1);
+    }
+      
+
+    if (argc >= 2) {
+      cli_filename = argv[1];
+      if (cli_filename != "" && cli_filename != "NULL") {
+        printf("using %s as CSV output path\n", cli_filename.c_str());
+      }
+    }
+    signal(SIGINT, interrupt_handler);
 
     std::thread collector(collector_thread);
     std::thread archiver(archiver_thread);
