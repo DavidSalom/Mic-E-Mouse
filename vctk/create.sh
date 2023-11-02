@@ -38,20 +38,24 @@ fi
 
 c_spkr=$(cat < ./c_spkr)
 echo $c_spkr
-list_dir=($(ls stock/wav48_silence_trimmed | sort | sed "0,/^$c_spkr$/d"))
+list_dir=($c_spkr)
+list_dir+=($(ls stock/wav48_silence_trimmed | sort | sed "0,/^$c_spkr$/d"))
 
 IFS=$'\n'
 for item in ${list_dir[@]}
 do
   list_flac+=($(find stock/wav48_silence_trimmed/$item -iname "$item*mic2.flac"))
-  echo ${#list_flac[@]}
+  #echo ${#list_flac[@]}
+  #echo $item
 done
 unset IFS
 
 
 n_flac=${#list_flac[@]}
+
+n_all_flac=$(find stock/wav48_silence_trimmed -iname '*mic2.flac'  | wc -l)
 echo $n_flac
-n_comp=0.0
+n_comp=$(echo "$n_all_flac - $n_flac" | bc)
 
 #n_flac=$(echo "$list_flac" | wc -l)
 
@@ -59,6 +63,20 @@ total_time=0
 unint_time=0
 max_unint_time=3600
 
+
+#l=""
+#for item in ${list_flac[@]}
+#do
+  #base_file=$(basename $item)
+  #base_file=${base_file:0:4}
+
+  #if [[ "$l" != "$base_file" ]]
+  #then
+    #echo "$base_file"
+    #l=$base_file
+  #fi
+
+#done
 
 # recording 4 min of silence
 silence_length=1
@@ -190,8 +208,6 @@ do
 
   wait $pid_flac
   wait $pid_log
-
-  #trap - SIGINT
 
   cd vctk
 done
