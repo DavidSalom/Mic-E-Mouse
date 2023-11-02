@@ -222,8 +222,7 @@ int main(int argc, char** argv) {
         break;
 
       case G502:
-        std::cerr << "UNIMPLEMENTED" << std::endl;
-        exit(1);
+        mouse_cmd = "cat /proc/bus/input/devices | grep -A5 -ne \"\\\"Logitech G502 HERO Gaming Mouse\\\"\" | sed '/Handlers=.* mouse[0-9]/!d' | sed -E 's/(.*)(mouse.*)/\\2/g'";
         break;
       default:
         std::cerr << "bad mouse" << std::endl;
