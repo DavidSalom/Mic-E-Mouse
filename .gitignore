@@ -11,4 +11,5 @@ build/*
 vctk/VCTK-Corpus-0.92
 vctk/resampled
 vctk/gen
+vctk/noise
 data/
