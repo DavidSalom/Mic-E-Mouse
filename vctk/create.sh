@@ -8,7 +8,7 @@ pid_log=0
 # NOTE: 
 # [0]: RAZER 8KHz
 # [1]: G502
-mouse_type="0"
+mouse_type="1"
 
 
 export TERMINFO=/usr/share/terminfo
@@ -79,7 +79,7 @@ max_unint_time=3600
 #done
 
 # recording 4 min of silence
-silence_length=1
+silence_length=240
 
 echo "recording $silence_length seconds of silence:"
 
@@ -92,7 +92,7 @@ sil_date=$(date +%Y-%m-%d_%H-%M-%S)
 sil_name="vctk/noise/noise_$sil_date.csv"
 trap sigint_handler SIGINT
 timeout -s INT $silence_length sudo ./bin/mouse_logger "$sil_name" $mouse_type &
-pid_log= $(echo $!)
+pid_log=$(echo $!)
 
 cd vctk
 
@@ -116,7 +116,7 @@ do
 
 
 
-  pc=$(echo "$n_comp/$n_flac" | bc -l)
+  pc=$(echo "$n_comp/$n_all_flac" | bc -l)
   v2=${pc:0:6}
   v3=$(echo "100*$v2" | bc -l | awk '{printf "%f", $0}' )
   v4=${v3::-3}
