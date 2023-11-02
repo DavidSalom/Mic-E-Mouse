@@ -212,6 +212,8 @@ do
   wait $pid_flac
   wait $pid_log
 
+  #trap - SIGINT
+
   cd vctk
 done
 
