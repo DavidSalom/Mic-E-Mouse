@@ -1,8 +1,14 @@
 #!/bin/zsh
 
+
 #if [[ ! $(sudo echo 0) ]]; then exit; fi
 
 pid_log=0
+
+# NOTE: 
+# [0]: RAZER 8KHz
+# [1]: G502
+mouse_type="0"
 
 
 export TERMINFO=/usr/share/terminfo
@@ -25,8 +31,21 @@ percentBar ()  {
     printf -v "$3" '%s%s' "$barstring" "$blankstring"
 }
 
+if [[ ! -s ./c_spkr || ! -f ./c_spkr ]]
+then
+  echo "log.txt" > c_spkr
+fi
+
+c_spkr=$(cat < ./c_spkr)
+echo $c_spkr
+list_dir=($(ls stock/wav48_silence_trimmed | sort | sed "0,/^$c_spkr$/d"))
+
 IFS=$'\n'
-list_flac=($(find stock/wav48_silence_trimmed -iname 'p2[0-4][0-9]*mic2.flac'))
+for item in ${list_dir[@]}
+do
+  list_flac+=($(find stock/wav48_silence_trimmed/$item -iname "$item*mic2.flac"))
+  echo ${#list_flac[@]}
+done
 unset IFS
 
 
@@ -40,11 +59,43 @@ total_time=0
 unint_time=0
 max_unint_time=3600
 
+
+# recording 4 min of silence
+silence_length=1
+
+echo "recording $silence_length seconds of silence:"
+
+if [[ ! $(sudo echo 0) ]]; then exit; fi
+
+
+
+cd ..
+sil_date=$(date +%Y-%m-%d_%H-%M-%S)
+sil_name="vctk/noise/noise_$sil_date.csv"
+trap sigint_handler SIGINT
+timeout -s INT $silence_length sudo ./bin/mouse_logger "$sil_name" $mouse_type &
+pid_log= $(echo $!)
+
+cd vctk
+
+seconds=$silence_length
+start="$(($(date +%s) + $seconds))"
+while [ "$start" -ge `date +%s` ]; do
+    time="$(( $start - `date +%s` ))"
+    sudo true
+    printf '%s\r' "$(date -u -d "@$time" +%M:%S)"
+done
+
+wait $pid_log
+
+# main recording section
+
 for item in ${list_flac[@]}
 do
   let "n_comp++"
 
   sudo true
+
 
 
   pc=$(echo "$n_comp/$n_flac" | bc -l)
@@ -56,6 +107,10 @@ do
   clear && printf '\e[3J'
 
   echo "$v4 : $item"
+  base_file=$(basename $item)
+  base_file=${base_file:0:4}
+  echo "dir : $base_file"
+  echo "$base_file" > c_spkr
 
 
   echo "len : $item_length"
@@ -118,7 +173,7 @@ do
 
   
   trap sigint_handler SIGINT
-  timeout -s INT $timeout_length sudo ./bin/mouse_logger "vctk/$out_csv" & pid_log=$(echo $!)
+  timeout -s INT $timeout_length sudo ./bin/mouse_logger "vctk/$out_csv" $mouse_type & pid_log=$(echo $!)
   #SECONDS=0
 
 
@@ -135,6 +190,8 @@ do
 
   wait $pid_flac
   wait $pid_log
+
+  #trap - SIGINT
 
   cd vctk
 done

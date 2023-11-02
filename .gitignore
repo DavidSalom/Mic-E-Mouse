@@ -10,4 +10,5 @@ build/*
 
 vctk/stock
 vctk/gen
+vctk/noise
 data/
