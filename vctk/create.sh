@@ -8,8 +8,11 @@ pid_log=0
 # NOTE: 
 # [0]: RAZER 8KHz
 # [1]: G502
-mouse_type="1"
-
+# if mouse_type is not provided, default to RAZER 8KHz, we can provide mouse_type using the first argument
+mouse_type=$1
+if [[ -z "$mouse_type" ]]; then
+  mouse_type=0;
+fi
 
 export TERMINFO=/usr/share/terminfo
 
