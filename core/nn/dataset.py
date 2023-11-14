@@ -5,43 +5,30 @@ import torchaudio
 from torch import Tensor
 from torch.utils.data import Dataset
 from ..signal.preprocess import *
+from ..signal.align import *
+from .utils import CacheMixin
+from ..cache import *
+import logging
+import hashlib
 
 SampleType = Tuple[Tensor, int, str, str, str]
 
 
-class VCTK_092(Dataset):
-    """*VCTK 0.92* :cite:`yamagishi2019vctk` dataset
-
-    Args:
-        root (str): Root directory where the dataset's top level directory is found.
-        mic_id (str, optional): Microphone ID. Either ``"mic1"`` or ``"mic2"``. (default: ``"mic2"``)
-        download (bool, optional):
-            Whether to download the dataset if it is not found at root path. (default: ``False``).
-        audio_ext (str, optional): Custom audio extension if dataset is converted to non-default audio format.
-
-    Note:
-        * All the speeches from speaker ``p315`` will be skipped due to the lack of the corresponding text files.
-        * All the speeches from ``p280`` will be skipped for ``mic_id="mic2"`` due to the lack of the audio files.
-        * Some of the speeches from speaker ``p362`` will be skipped due to the lack of  the audio files.
-        * See Also: https://datashare.is.ed.ac.uk/handle/10283/3443
+class VCTK_CSV(Dataset):
+    """
+    Create a Dataset for VCTK Corpus, from corresponding CSV files.
+    This class emulates torchaudio.datasets.VCTK_092 but with CSV files instead of WAV files.
     """
 
     def __init__(
         self,
         root: str,
-        mic_id: str = "mic2",
-        audio_ext=".csv",
-        maxLen = 226209
+        audio_ext=".csv"
     ):
-        if mic_id not in ["mic1", "mic2"]:
-            raise RuntimeError(f'`mic_id` has to be either "mic1" or "mic2". Found: {mic_id}')
-
         self._path = root
         self._txt_dir = os.path.join(self._path, "txt")
         self._audio_dir = os.path.join(self._path, "wav48_silence_trimmed")
-        self._mic_id = mic_id
         self._audio_ext = audio_ext
-        self.maxLen = maxLen
 
         if not os.path.isdir(self._path):
             raise RuntimeError("Dataset not found. Please use `download=True` to download it.")
@@ -50,18 +37,8 @@ class VCTK_092(Dataset):
         self._speaker_ids = sorted(os.listdir(self._txt_dir))
         self._sample_ids = []
 
-        """
-        Due to some insufficient data complexity in the 0.92 version of this dataset,
-        we start traversing the audio folder structure in accordance with the text folder.
-        As some of the audio files are missing of either ``mic_1`` or ``mic_2`` but the
-        text is present for the same, we first check for the existence of the audio file
-        before adding it to the ``sample_ids`` list.
-
-        Once the ``audio_ids`` are loaded into memory we can quickly access the list for
-        different parameters required by the user.
-        """
         for speaker_id in self._speaker_ids:
-            if speaker_id == "p280" and mic_id == "mic2":
+            if speaker_id == "p280":
                 continue
             utterance_dir = os.path.join(self._txt_dir, speaker_id)
             for utterance_file in sorted(f for f in os.listdir(utterance_dir) if f.endswith(".txt")):
@@ -69,7 +46,7 @@ class VCTK_092(Dataset):
                 audio_path_mic = os.path.join(
                     self._audio_dir,
                     speaker_id,
-                    f"{utterance_id}_{mic_id}{self._audio_ext}",
+                    f"{utterance_id}_mic2.csv",
                 )
                 if speaker_id == "p362" and not os.path.isfile(audio_path_mic):
                     continue
@@ -80,19 +57,20 @@ class VCTK_092(Dataset):
             return file_path.readlines()[0]
 
     def _load_audio(self, file_path) -> Tuple[Tensor, int]:
+        """
+        Load the csv files by running the preprocessing pipeline from core.signal.preprocess
+        """
         T, X, Y = processFromFile(file_path, skipPCA = True)
-        X = torch.nn.functional.pad(X, (0, self.maxLen - X.shape[0]))
-        Y = torch.nn.functional.pad(Y, (0, self.maxLen - Y.shape[0]))
         XY = torch.stack((X, Y), dim=0)
         
         return XY, 16000
 
-    def _load_sample(self, speaker_id: str, utterance_id: str, mic_id: str) -> SampleType:
+    def _load_sample(self, speaker_id: str, utterance_id: str) -> SampleType:
         transcript_path = os.path.join(self._txt_dir, speaker_id, f"{speaker_id}_{utterance_id}.txt")
         audio_path = os.path.join(
             self._audio_dir,
             speaker_id,
-            f"{speaker_id}_{utterance_id}_{mic_id}{self._audio_ext}",
+            f"{speaker_id}_{utterance_id}_mic2.csv",
         )
 
         # Reading text
@@ -124,7 +102,39 @@ class VCTK_092(Dataset):
                 Utterance ID
         """
         speaker_id, utterance_id = self._sample_ids[n]
-        return self._load_sample(speaker_id, utterance_id, self._mic_id)
+        return self._load_sample(speaker_id, utterance_id)
 
     def __len__(self) -> int:
         return len(self._sample_ids)
+
+
+class PairedAudioDataset(torch.utils.data.Dataset):
+    """
+    Create a Dataset for paired data, from two datasets.
+    """
+    def __init__(self, groundTruthDataset, sensorDataset):
+        super(PairedAudioDataset, self).__init__()
+        # Initialize the dataset with two sub-datasets, an offset and a lowpass filter value.
+        self.gtDS = groundTruthDataset
+        self.sensorDS = sensorDataset
+        logging.info("Initializing PairedAudioDataset...")
+        # Ensure both datasets have the same length.
+        assert len(groundTruthDataset) == len(sensorDataset), "Datasets must be the same length"
+
+    def __len__(self):
+        # Return the length of the dataset.
+        return len(self.gtDS)
+
+    def __getitem__(self, idx):
+        # Retrieve items from both datasets.
+        wav_gt, sr_gt, txt_gt, speaker_gt, data_gt = self.gtDS[idx]
+        wav_sensor, sr_sensor, _, _, _ = self.sensorDS[idx]
+        
+        if sr_gt != sr_sensor: # Resample if necessary (which is most of the time)
+            transform = torchaudio.transforms.Resample(sr_sensor, sr_gt) # The assumption is that srA is the wanted sample rate
+            wav_sensor = transform(wav_sensor)
+            
+        
+        # Return a tuple containing the processed data.
+        newTuple = (wav_gt, wav_sensor, sr_sensor, txt_gt, speaker_gt, data_gt)
+        return newTuple
