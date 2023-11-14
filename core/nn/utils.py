@@ -44,6 +44,8 @@ class CacheMixin:
         # Create a name for the pickle file using the MD5 hash and the argument list
         file_name = f'.cache/{md5}.pickle'
 
+        os.makedirs('.cache', exist_ok=True)
+
         # If the pickle file exists, load the object from the pickle file
         if os.path.isfile(file_name):
             logging.info(f"Loading object from cache: {file_name}")
