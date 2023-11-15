@@ -5,11 +5,7 @@ import torchaudio
 from torch import Tensor
 from torch.utils.data import Dataset
 from ..signal.preprocess import *
-from ..signal.align import *
-from .utils import CacheMixin
-from ..cache import *
 import logging
-import hashlib
 
 SampleType = Tuple[Tensor, int, str, str, str]
 
