@@ -19,7 +19,8 @@ class VCTK_CSV(Dataset):
     def __init__(
         self,
         root: str,
-        audio_ext=".csv"
+        audio_ext=".csv",
+        Fs = 16000,
     ):
         self._path = root
         self._txt_dir = os.path.join(self._path, "txt")
@@ -32,6 +33,8 @@ class VCTK_CSV(Dataset):
         # Extracting speaker IDs from the folder structure
         self._speaker_ids = sorted(os.listdir(self._txt_dir))
         self._sample_ids = []
+
+        self.Fs = Fs
 
         for speaker_id in self._speaker_ids:
             if speaker_id == "p280":
@@ -56,10 +59,10 @@ class VCTK_CSV(Dataset):
         """
         Load the csv files by running the preprocessing pipeline from core.signal.preprocess
         """
-        T, X, Y = processFromFile(file_path, skipPCA = True)
+        T, X, Y = processFromFile(file_path, skipPCA = True, Fs = self.Fs)
         XY = torch.stack((X, Y), dim=0)
         
-        return XY, 16000
+        return XY, self.Fs
 
     def _load_sample(self, speaker_id: str, utterance_id: str) -> SampleType:
         transcript_path = os.path.join(self._txt_dir, speaker_id, f"{speaker_id}_{utterance_id}.txt")
@@ -127,8 +130,8 @@ class PairedAudioDataset(torch.utils.data.Dataset):
         wav_sensor, sr_sensor, _, _, _ = self.sensorDS[idx]
         
         if sr_gt != sr_sensor: # Resample if necessary (which is most of the time)
-            transform = torchaudio.transforms.Resample(sr_sensor, sr_gt) # The assumption is that srA is the wanted sample rate
-            wav_sensor = transform(wav_sensor)
+            transform = torchaudio.transforms.Resample(sr_gt, sr_sensor) # The assumption is that srA is the wanted sample rate
+            wav_gt = transform(wav_gt)
             
         
         # Return a tuple containing the processed data.
