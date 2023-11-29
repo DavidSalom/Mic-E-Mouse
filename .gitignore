@@ -10,3 +10,6 @@ build/*
 
 vctk/*/
 data/
+
+test.flac
+*.pt
