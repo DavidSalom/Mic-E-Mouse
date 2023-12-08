@@ -59,7 +59,7 @@ class VCTK_CSV(Dataset):
         """
         Load the csv files by running the preprocessing pipeline from core.signal.preprocess
         """
-        T, X, Y = processFromFile(file_path, skipPCA = True, Fs = self.Fs)
+        T, X, Y = processFromFile(file_path, skipPCA = True, Fs = self.Fs, resampleFn="sinc")
         XY = torch.stack((X, Y), dim=0)
         
         return XY, self.Fs
