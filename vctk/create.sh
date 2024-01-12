@@ -14,6 +14,13 @@ if [[ -z "$mouse_type" ]]; then
   mouse_type=0;
 fi
 
+path_file=$2
+if [[ -z "$path_file" ]]; then
+  path_file="NONE";
+fi
+
+echo $path_file
+
 export TERMINFO=/usr/share/terminfo
 
 sigint_handler()
@@ -62,6 +69,54 @@ n_comp=$(echo "$n_all_flac - $n_flac" | bc)
 
 #n_flac=$(echo "$list_flac" | wc -l)
 
+
+if [[ $path_file != "NONE" ]]
+then
+
+  zmodload zsh/mapfile
+  pf_paths=( "${(f)mapfile[$path_file]}" )
+
+  #
+  # NOTE: you need to path_file paths to NOT start with vctk
+  #
+
+  #pf_paths=$list_flac
+
+
+  declare -a q_pf
+
+  for item in $pf_paths
+  do
+      i_ext=$item:t:e
+
+      if [[ ! "-f ../$item" || "$i_ext" -ne "flac" ]]
+      then
+        echo "BAD FILE: "
+      else
+        #echo $i_ext
+        #accept_path=$(soxi -D $(echo "$item" | tr -d ' '))
+        accept_path=$(echo "$item" | tr -d ' ')
+
+        q_pf+=( $accept_path )
+      fi
+      #echo $q_pf
+  done
+
+  n_flac=$#q_pf
+  n_all_flac=$#q_pf
+  n_comp=0
+
+
+  list_flac=("${q_pf[@]}")
+
+  
+  
+
+  #sleep 100
+fi
+
+
+
 total_time=0
 unint_time=0
 max_unint_time=3600
@@ -82,7 +137,7 @@ max_unint_time=3600
 #done
 
 # recording 4 min of silence
-silence_length=240
+silence_length=1
 
 echo "recording $silence_length seconds of silence:"
 
@@ -116,6 +171,9 @@ do
   let "n_comp++"
 
   sudo true
+
+
+  echo $item
 
 
 
@@ -211,6 +269,8 @@ do
 
   wait $pid_flac
   wait $pid_log
+
+  #trap - SIGINT
 
   cd vctk
 done
