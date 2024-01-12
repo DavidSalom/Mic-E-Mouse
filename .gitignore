@@ -8,8 +8,7 @@ wandb/*
 .ipynb_checkpoints/
 build/*
 
-vctk/VCTK-Corpus-0.92
-vctk/resampled
-vctk/gen
-vctk/noise
+vctk/*/
 data/
+AudioMNIST/
+MICEMOUSE/

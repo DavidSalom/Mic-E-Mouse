@@ -1,88 +1,102 @@
 """
 MicEMouse Utils
-=====
-This module contains utility functions and classes:
-Provides
-  1. CacheMixin: A mixin class that provides caching functionality for Python objects.
 """
-import os
-import pickle
-import hashlib
-import inspect
-import logging
+import torch.nn.functional as F
+import torchaudio
+import torch
+from einops import reduce, rearrange
+import einops
 
-class CacheMixin:
-    """
-    A mixin class that adds caching functionality. 
-    The created object is cached as a pickle file, and the same object is retrieved from cache 
-    if created again with the same arguments.
-    """
+def trim_or_pad(x, T):
+    if x.shape[-1] > T:
+        return x[:T]
+    else:
+        # return F.pad(x, (0, T - x.shape[-1]))
+        # pad at the end instead
+        return F.pad(x, (0, T - x.shape[-1]), mode='constant', value=0)
 
-    @classmethod
-    def cache_constructor(cls, *args, **kwargs):
-        """
-        A class method that either creates a new object if it does not exist in the cache, 
-        or retrieves it from the cache if it already exists.
+def trim_or_pad2(x, T):
+    if x.shape[-1] > T:
+        return x[:, :T]
+    else:
+        return F.pad(x, (0, T - x.shape[-1]), mode="constant", value=0)
 
-        Args:
-            *args: Variable length argument list.
-            **kwargs: Arbitrary keyword arguments.
+def buildTransforms(device, Fs, n_fft, win_length, hop_length, n_mels, f_max_mouse, f_max_full):
+    specFn = torchaudio.transforms.Spectrogram(
+        n_fft=n_fft,
+        win_length=win_length,
+        hop_length=hop_length,
+        power=None,
+    ).to(device)
 
-        Returns:
-            obj: An instance of the class.
-        """
+    inverseSpecFn = torchaudio.transforms.GriffinLim(
+        n_fft=n_fft,
+        win_length=win_length,
+        hop_length=hop_length,
+        power=2,
+    ).to(device)
 
-        # Get the source code of the class file
-        source_code = inspect.getsource(cls)
+    melFilterMouse = torchaudio.functional.melscale_fbanks(
+        n_mels=n_mels,
+        sample_rate=Fs,
+        f_min=20,
+        f_max=f_max_mouse,
+        n_freqs=n_fft// 2 + 1,
+    ).T.to(device)
 
-        str_to_hash =  f'{str(source_code)}_{"_".join(map(str, args))}_{"_".join(map(str, kwargs.values()))}'
+    melFilter = torchaudio.functional.melscale_fbanks(
+        n_mels=n_mels,
+        sample_rate=Fs,
+        f_min=20,
+        f_max=f_max_full,
+        n_freqs=n_fft// 2 + 1,
+    ).T.to(device)
 
-        # Compute the MD5 hash of the source code and the argument list
-        md5 = hashlib.md5(str_to_hash.encode()).hexdigest()
-        logging.debug(f"MD5 hash: {md5}")
+    inverseMelFn = torchaudio.transforms.InverseMelScale(
+        n_stft=n_fft//2 + 1,
+        n_mels=n_mels,
+        sample_rate=Fs,
+        f_min=20,
+        f_max=f_max_full,
+    ).to(device)
+    return specFn, inverseSpecFn, melFilterMouse, melFilter, inverseMelFn
 
-        # Create a name for the pickle file using the MD5 hash and the argument list
-        file_name = f'.cache/{md5}.pickle'
+def normalize(batch):
+    M, W = batch
+    # Zero mean
+    W -= reduce(W, "b t -> b ()", "mean")
+    M -= reduce(M, "b c t -> b c ()", "mean")
+    # # Normalize power
+    W /= torch.std(W)
+    M /= torch.std(M)
+    return M, W
 
-        # If the pickle file exists, load the object from the pickle file
-        if os.path.isfile(file_name):
-            logging.info(f"Loading object from cache: {file_name}")
-            with open(file_name, 'rb') as file:
-                obj = pickle.load(file)
-            return obj
+def denormalize(X, Yorig):
+    X *= torch.std(Yorig - reduce(Yorig, "b t -> b ()", "mean"))
+    X += reduce(Yorig, "b t -> b ()", "mean")
+    # # Normalize power
+    return X
 
-        # If the pickle file does not exist, create a new object, pickle it, and save it to a file
-        else:
-            logging.info(f"Creating new object and saving it to cache: {file_name}")
-            obj = cls(*args, **kwargs)
-            with open(file_name, 'wb') as file:
-                pickle.dump(obj, file)
-            return obj
+def toMelDB(batch, specFn, mousemelfilters, fullmelfilter):
+    M, W = batch
 
-    @staticmethod
-    def save_object(obj, file_name):
-        """
-        A method that pickles and saves an object to a file.
+    W = specFn(W)
+    M = specFn(M)
 
-        Args:
-            obj: The object to be saved.
-            file_name: The name of the file to save the object in.
-        """
+    Wphase = W.angle()
+    Mphase = M.angle()
 
-        with open(file_name, 'wb') as file:
-            pickle.dump(obj, file)
+    W = W.abs().pow(2)
+    M = M.abs().pow(2)
 
-    @staticmethod
-    def load_object(file_name):
-        """
-        A method that loads a pickled object from a file.
 
-        Args:
-            file_name: The name of the file to load the object from.
+    W = torch.einsum("bct,fc->bft", W, fullmelfilter)
+    M = torch.einsum("bkct,fc->bkft", M, mousemelfilters)
+    
+    M = rearrange(M, "b c m t -> b (m c) t", c=2)
 
-        Returns:
-            The loaded object.
-        """
+    # Amplitude to dB (Whisper formula)
+    W = (torch.maximum(torch.clamp(W, min=1e-10).log10(), torch.clamp(W, min=1e-10).log10().max() - 8.0) + 4.0)/ 4.0
+    M = (torch.maximum(torch.clamp(M, min=1e-10).log10(), torch.clamp(M, min=1e-10).log10().max() - 8.0) + 4.0)/ 4.0
 
-        with open(file_name, 'rb') as file:
-            return pickle.load(file)
+    return M, W, Mphase, Wphase
