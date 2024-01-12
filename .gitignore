@@ -10,6 +10,8 @@ build/*
 
 vctk/*/
 data/
+AudioMNIST/
+MICEMOUSE/
 
 test.flac
 *.pt

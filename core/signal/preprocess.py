@@ -27,9 +27,9 @@ def sinc(x):
     """Helper function to compute the sinc function."""
     return torch.where(x == 0, torch.ones_like(x), torch.sin(x) / x)
 
-def resample(nuT : torch.Tensor, nuX : torch.Tensor, nuY : torch.Tensor, Fs : int = 16000) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+def resample(nuT : torch.Tensor, nuX : torch.Tensor, nuY : torch.Tensor, Fs : int = 16000, method : str = "cubic", device : str = "cpu") -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
-    Resample the signal to uniformize the sampling rate. Implements https://dl.acm.org/doi/10.1109/78.869037 for sinc-based resampling.
+    Resample the signal to uniformize the sampling rate.
     :param T: The nonuniform time vector.
     :param nuX: The nonuniform X vector.
     :param nuY: The nonuniform Y vector.
@@ -40,27 +40,47 @@ def resample(nuT : torch.Tensor, nuX : torch.Tensor, nuY : torch.Tensor, Fs : in
     Tcumul = torch.cumsum(nuT, dim=0) - nuT[0]
     # Tmax is in microseconds, the offset for the largest time in the signal
     Tmax = Tcumul[-1] 
-    # Tmax is in seconds
-    TmaxSeconds = Tmax / 1e6
     # Number of samples at Fs
-    numSamples = int(TmaxSeconds * Fs)
+    numSamples = int(Tmax * Fs / 1e6)
     # Create a uniform-time vector
-    Tperiodic = torch.linspace(0, TmaxSeconds, numSamples)
-    idxx = torch.searchsorted(Tcumul, Tperiodic * 1e6) - 1
+    Tperiodic = torch.linspace(0, Tmax, numSamples, device = device)
 
-    X = torch.zeros_like(Tperiodic)
-    Y = torch.zeros_like(Tperiodic)
-    for i, t in tqdm(enumerate(Tperiodic)):
-        sinc_coeffs = sinc(torch.pi * Fs * (t - Tcumul / 1e6))
-        X[i] = torch.sum(nuX * sinc_coeffs)
-        Y[i] = torch.sum(nuY * sinc_coeffs)
-    
+    idxx = torch.searchsorted(Tcumul, Tperiodic) - 1
+    # idk why this is necessary but it is. TODO: investigate
+    # idxx[idxx < 0] = 0
+    # idxx[idxx > Tcumul.shape[0] - 2] = Tcumul.shape[0] - 2
+    X = torch.zeros_like(Tperiodic, device = device)
+    Y = torch.zeros_like(Tperiodic, device = device)
+    if method == "nearest":
+        X = nuX[idxx]
+        Y = nuY[idxx]
+    if method == "linear":
+        W = ((Tperiodic - Tcumul[idxx])/(Tcumul[idxx + 1] - Tcumul[idxx]))
+        W0 = 1 - W
+        W1 = W
+        X = W0 * nuX[idxx] + W1 * nuX[idxx + 1]
+        Y = W0 * nuY[idxx] + W1 * nuY[idxx + 1]
+    if method == "cubic":
+        W = ((Tperiodic - Tcumul[idxx])/(Tcumul[idxx + 1] - Tcumul[idxx]))
+        W0 = 2 * W ** 3 - 3 * W ** 2 + 1
+        W1 = - 2 * W ** 3 + 3 * W ** 2
+        X = W0 * nuX[idxx] + W1 * nuX[idxx + 1]
+        Y = W0 * nuY[idxx] + W1 * nuY[idxx + 1]
+    if method == "sinc":
+        W = ((Tperiodic - Tcumul[idxx])/(Tcumul[idxx + 1] - Tcumul[idxx]))
+        W0 = sinc((1 - W) * np.pi)
+        W1 = sinc(W * np.pi)
+        X = W0 * nuX[idxx] + W1 * nuX[idxx + 1]
+        Y = W0 * nuY[idxx] + W1 * nuY[idxx + 1]
     return Tperiodic, X, Y
 
-def processFromFile(fn, Fs = 16000):
+def processFromFile(fn, Fs = 16000, method = "cubic", device = 'cpu'):
     """
     Convenience function to load, and resample data from a file.
     """
     nuT, nuX, nuY = loadData(fn)
-    T, X, Y = resample(nuT, nuX, nuY, Fs=Fs)
+    nuT = nuT.to(device)
+    nuX = nuX.to(device)
+    nuY = nuY.to(device)
+    T, X, Y = resample(nuT, nuX, nuY, Fs=Fs, method=method, device = device)
     return T, X, Y
