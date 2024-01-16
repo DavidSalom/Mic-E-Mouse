@@ -37,12 +37,21 @@ leg_labels=['1000Hz', '4000Hz', '8000Hz', '>8000Hz']
 handles = [plt.Rectangle((0,0),1,1, color=label) for label in accept_colors]
 plt.legend(handles, leg_labels)
 
+sum_c = [0,0,0,0]
+for i in range(len(x)):
+    # print(accept_colors.index(colors[i]))
+    sum_c[accept_colors.index(colors[i])] += y[i]
+
+print(list(zip(sum_c,leg_labels)))
 print("sum {}".format(np.sum(y)))
+
+# plt.pie(sum_c)
+# plt.savefig("phoneme_pie.svg", format="svg")
+# plt.show()
+
 plt.bar(x, y, color = colors, label="Phoneme Frequency") 
 plt.xlabel('Phoneme') 
 plt.ylabel('Frequency (%)') 
-# plt.xlim(2000,2025)
-# plt.ylim(0,30000)
-plt.title('Phoneme Prevalance v. Required Polling Rate') 
+plt.title('Phoneme Prevalence v. Required Polling Rate') 
 plt.savefig("phoneme.svg", format="svg")
 plt.show()
