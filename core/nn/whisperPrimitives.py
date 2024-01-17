@@ -1,5 +1,3 @@
-import base64
-import gzip
 from typing import Dict, Iterable, Optional
 
 import numpy as np
@@ -69,6 +67,7 @@ class MultiHeadAttention(nn.Module):
 
         wv, qk = self.qkv_attention(q, k, v, mask)
         return self.out(wv), qk
+    
 
     def qkv_attention(
         self, q: Tensor, k: Tensor, v: Tensor, mask: Optional[Tensor] = None
@@ -113,7 +112,7 @@ class ResidualAttentionBlock(nn.Module):
         mask: Optional[Tensor] = None,
         kv_cache: Optional[dict] = None,
     ):
-        x = x + self.attn(self.attn_ln(x), mask=mask, kv_cache=kv_cache)[0]
+        x = x + self.attn(self.attn_ln(x), xa, mask=mask, kv_cache=kv_cache)[0]
         x = x + self.mlp(self.mlp_ln(x))
         return x
 
@@ -129,7 +128,40 @@ class TransformerChain(nn.Module):
         )
         self.ln_post = LayerNorm(n_state)
     
+    def forward(self, x: Tensor, xa: Optional[Tensor] = None, mask: Optional[Tensor] = None):
+        x = x.permute(0, 2, 1)
+        assert x.shape[1:] == self.positional_embedding.shape, "incorrect audio shape"
+        x = (x + self.positional_embedding).to(x.dtype)
+
+        for block in self.blocks:
+            x = block(x, xa, mask)
+
+        x = self.ln_post(x)
+        x = x.permute(0, 2, 1)
+        return x
+    
+    
+class AudioEncoder(nn.Module):
+    def __init__(
+        self, n_mels: int, n_ctx: int, n_state: int, n_head: int, n_layer: int, k_size: int = 15
+    ):
+        super().__init__()
+        self.conv1 = Conv1d(2 * n_mels, n_state, kernel_size=k_size, padding=k_size//2)
+        self.conv2 = Conv1d(n_state, n_state, kernel_size=k_size, padding=k_size//2)
+        self.register_buffer("positional_embedding", sinusoids(n_ctx, n_state))
+
+        self.blocks: Iterable[ResidualAttentionBlock] = nn.ModuleList(
+            [ResidualAttentionBlock(n_state, n_head) for _ in range(n_layer)]
+        )
+        self.ln_post = LayerNorm(n_state)
+        
+
     def forward(self, x: Tensor):
+        """
+        x : torch.Tensor, shape = (batch_size, 2 * n_mels, n_ctx) the mel spectrogram of the audio
+        """
+        x = F.gelu(self.conv1(x))
+        x = F.gelu(self.conv2(x))
         x = x.permute(0, 2, 1)
         assert x.shape[1:] == self.positional_embedding.shape, "incorrect audio shape"
         x = (x + self.positional_embedding).to(x.dtype)
@@ -138,26 +170,61 @@ class TransformerChain(nn.Module):
             x = block(x)
 
         x = self.ln_post(x)
-        x = x.permute(0, 2, 1)
         return x
-    
-class AudioEncoder(nn.Module):
+
+
+class AudioDecoder(nn.Module):
     def __init__(
-        self, n_mels: int, n_ctx: int, n_state: int, n_head: int, n_layer: int
+        self, n_mels: int, n_ctx: int, n_state: int, n_head: int, n_layer: int, k_size: int = 15
     ):
         super().__init__()
-        self.conv1 = Conv1d(n_mels, n_state, kernel_size=3, padding=1)
-        self.conv2 = Conv1d(n_state, n_state, kernel_size=3, stride=2, padding=1)
-        self.TransformerChain = TransformerChain(n_ctx, n_state, n_head, n_layer)
-        
 
-    def forward(self, x: Tensor):
+        self.positional_embedding = nn.Parameter(torch.empty(n_ctx, n_state))
+        self.conv2 = Conv1d(n_mels, n_state, kernel_size=k_size, padding=k_size//2)
+        self.blocks: Iterable[ResidualAttentionBlock] = nn.ModuleList(
+            [
+                ResidualAttentionBlock(n_state, n_head, cross_attention=True) for _ in range(n_layer)
+            ]
+        )
+        self.ln = LayerNorm(n_state)
+
+        mask = torch.empty(n_ctx, n_ctx).fill_(-np.inf).triu_(1)
+        self.register_buffer("mask", mask, persistent=False)
+
+    def forward(self, x: Tensor, xa: Tensor, kv_cache: Optional[dict] = None):
         """
-        x : torch.Tensor, shape = (batch_size, n_mels, n_ctx)
-            the mel spectrogram of the audio
+        x : torch.LongTensor, shape = (batch_size, n_mels, <=n_ctx) the current audio features, from the previous timestep
+        xa : torch.Tensor, shape = (batch_size, n_ctx, n_state) the encoded audio features to be attended on
         """
-        x = F.gelu(self.conv1(x))
         x = F.gelu(self.conv2(x))
         x = x.permute(0, 2, 1)
+        x = x + self.positional_embedding[:x.shape[1], :]
+        x = x.to(xa.dtype)
 
-        return self.TransformerChain(x)
+        for block in self.blocks:
+            x = block(x, xa, mask=self.mask, kv_cache=kv_cache)
+
+        x = self.ln(x)
+
+        return x
+
+
+class EncoderDecoder(nn.Module):
+    def __init__(self, n_mels: int, n_ctx: int, n_state: int, n_head: int, n_layer: int, k_size: int = 15):
+        super().__init__()
+        self.encoder = AudioEncoder(n_mels, n_ctx, n_state, n_head, n_layer, k_size)
+        self.decoder = AudioDecoder(n_mels, n_ctx, n_state, n_head, n_layer)
+        self.conv1 = Conv1d(n_state, n_state * 4, kernel_size=k_size, padding=k_size//2)
+        self.conv2 = Conv1d(n_state * 4, n_mels, kernel_size=k_size, padding=k_size//2)
+    
+    def forward(self, x: Tensor, y: Tensor):
+        """
+        x : torch.Tensor, shape = (batch_size, n_mels, n_ctx) the mel spectrogram of the audio encoded
+        y : torch.Tensor, shape = (batch_size, n_mels, n_ctx) the mel spectrogram of the audio being built
+        """
+        xa = self.encoder(x)
+        y = self.decoder(y, xa)
+        y = y.permute(0, 2, 1)
+        y = F.gelu(self.conv1(y))
+        y = self.conv2(y)
+        return y
