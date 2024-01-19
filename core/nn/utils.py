@@ -100,3 +100,19 @@ def toMelDB(batch, specFn, mousemelfilters, fullmelfilter):
     M = (torch.maximum(torch.clamp(M, min=1e-10).log10(), torch.clamp(M, min=1e-10).log10().max() - 8.0) + 4.0)/ 4.0
 
     return M, W, Mphase, Wphase
+
+def mapToBounds(batch, mnmn, mxmx):
+    M, W = batch
+    # remap to [-1, 1]
+    W = (W - mnmn) / (mxmx - mnmn)
+    M = (M - mnmn) / (mxmx - mnmn)
+    W = torch.clamp(W, 0, 1)
+    M = torch.clamp(M, 0, 1)
+    W = 2 * W - 1
+    M = 2 * M - 1
+    return  M, W
+
+def apply_wiener(X, filt = H.to(device)):
+    Xfft = torch.fft.rfft(X, dim=-1)
+    Yfft = Xfft * filt
+    return torch.fft.irfft(Yfft, dim=-1)
