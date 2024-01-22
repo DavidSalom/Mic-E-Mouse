@@ -170,6 +170,7 @@ class AudioEncoder(nn.Module):
             x = block(x)
 
         x = self.ln_post(x)
+
         return x
 
 

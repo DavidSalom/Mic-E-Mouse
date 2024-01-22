@@ -101,7 +101,7 @@ def toMelDB(batch, specFn, mousemelfilters, fullmelfilter):
 
     return M, W, Mphase, Wphase
 
-def mapToBounds(batch, mnmn, mxmx):
+def mapToBounds(batch, mnmn, mxmx): # These funcs take two specs in batch (M, W), although the same operation is being done on both. From a software engineering perspective, this is a bit of a code smell, but it's necessary to keep the notebook code clean.
     M, W = batch
     # remap to [-1, 1]
     W = (W - mnmn) / (mxmx - mnmn)
@@ -112,7 +112,19 @@ def mapToBounds(batch, mnmn, mxmx):
     M = 2 * M - 1
     return  M, W
 
-def apply_wiener(X, filt = H.to(device)):
+def inverseBounds(X, mnmn, mxmx):
+    X = (X + 1) / 2
+    X = X * (mxmx - mnmn) + mnmn
+    return X
+
+def fromMelDB(recon_batch, inverseMelFn, inverseSpecFn):
+    recon_batch = recon_batch * 4 - 4
+    recon_batch = torch.pow(10, recon_batch)
+    recon_batch = inverseMelFn(recon_batch)
+    recon_batch = inverseSpecFn(recon_batch)
+    return recon_batch
+
+def apply_wiener(X, filt):
     Xfft = torch.fft.rfft(X, dim=-1)
     Yfft = Xfft * filt
     return torch.fft.irfft(Yfft, dim=-1)

@@ -163,7 +163,7 @@ def removeOutliers(paired_ds, Fs = 16000):
     return filtered_paired_ds
 
 
-def getAudioLoaders(filtered_paired_ds, batch_size = 32, split = (0.85, 0.125, 0.025), device = "cpu", Fs = 16000):
+def getAudioLoaders(filtered_paired_ds, batch_size = 32, split = (0.85, 0.125, 0.025), device = "cpu", Fs = 16000, ret_labels = False):
     # Split into train, test, and dev
     trainSplit, testSplit, devSplit = split
     assert trainSplit + testSplit + devSplit == 1
@@ -189,6 +189,8 @@ def getAudioLoaders(filtered_paired_ds, batch_size = 32, split = (0.85, 0.125, 0
         N = len(batch)
         out_wavs = torch.zeros((N, 5 * Fs), device=device)
         out_mouse = torch.zeros((N, 2, 5 * Fs), device=device)
+        out_utterance = []
+        out_speaker = []
         i = 0
         for e in batch:
             W = trim_or_pad(e[0].squeeze(), 5 * Fs).to(device)
@@ -197,7 +199,12 @@ def getAudioLoaders(filtered_paired_ds, batch_size = 32, split = (0.85, 0.125, 0
             out_wavs[i] = W
             out_mouse[i] = M
 
+            out_utterance.append(e[5])
+            out_speaker.append(e[4])
+
             i += 1
+        if ret_labels:
+            return out_mouse, out_wavs, out_speaker, out_utterance
         return out_mouse, out_wavs
 
 
