@@ -72,7 +72,7 @@ def getAudioLoaders(ds, batch_size = 32, split = (0.85, 0.125, 0.025), device = 
 
             i += 1
         if ret_labels:
-            return out_mouse, out_wavs, out_digit, out_speaker
+            return out_mouse, out_wavs, out_speaker, out_digit
         return out_mouse, out_wavs
 
 
