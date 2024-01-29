@@ -23,6 +23,48 @@ then
     exit
 fi
 
+path_file=$2
+if [[ ! -z "$path_file" && ! -f "$path_file" ]] 
+then
+  echo "nonexistent file: $path_file"
+  exit
+
+else
+
+  zmodload zsh/mapfile
+  pf_paths=( "${(f)mapfile[$path_file]}" )
+
+  #
+  # NOTE: you need to path_file paths to NOT start with vctk
+  #
+
+  #pf_paths=$list_flac
+  declare -a q_pf
+
+  for item in $pf_paths
+  do
+      i_ext=$item:t:e
+
+      if [[ ! "-f ../$item" || "$i_ext" -ne "flac" ]]
+      then
+        echo "BAD FILE: "
+      else
+        #echo $i_ext
+        #accept_path=$(soxi -D $(echo "$item" | tr -d ' '))
+        accept_path=$(echo "$item" | tr -d ' ')
+
+        q_pf+=( $accept_path )
+      fi
+      #echo $q_pf
+  done
+
+  n_flac=$#q_pf
+  n_all_flac=$#q_pf
+  n_comp=0
+
+  echo "using input path file: $path_file with $n_flac valid FLAC files"
+fi
+
 
 # Default start and end times
 default_start_time="21:00" # 9 PM

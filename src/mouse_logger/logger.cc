@@ -35,7 +35,7 @@ static int SAMPLE_RATE = 8000;
 static MOUSE_TYPE m_type = MOUSE_TYPE::RAZER8KHZ;
 static std::string mouse_cmd;
 
-#define COLLECTION_TIME 5
+#define COLLECTION_TIME 120
 #define BUFFER_SIZE (SAMPLE_RATE * COLLECTION_TIME)
 
 
@@ -50,6 +50,7 @@ struct buffer_t{
     }
     std::mutex* mutex = new std::mutex();
     std::condition_variable* cv = new std::condition_variable();
+    bool sanity = false;
 
     bool push(entry_t entry){
         std::unique_lock<std::mutex> lock(*mutex);
@@ -63,15 +64,19 @@ struct buffer_t{
     }
 
     void stringify(char* str){
+      if (!sanity) {
         std::unique_lock<std::mutex> lock(*mutex);
         for (int i = 0; i < head; i++){
             sprintf(str + strlen(str), "%d, %d, %d\n", buffer[i].time, buffer[i].x, buffer[i].y);
         }
+        sanity = true;
+      }
     }
 
     void reset(){
         std::unique_lock<std::mutex> lock(*mutex);
         head = 0;
+        sanity = false;
     }
 
     void wait(){

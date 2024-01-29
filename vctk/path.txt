@@ -1,0 +1,2 @@
+stock/wav48_silence_trimmed/p225/p225_001_mic2.flac 
+stock/wav48_silence_trimmed/p225/p225_002_mic2.flac 

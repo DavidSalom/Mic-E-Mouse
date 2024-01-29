@@ -8,7 +8,10 @@ wandb/*
 .ipynb_checkpoints/
 build/*
 
-vctk/stock
-vctk/gen
-vctk/noise
+vctk/*/
 data/
+AudioMNIST/
+MICEMOUSE/
+
+test.flac
+*.pt
