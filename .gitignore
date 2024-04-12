@@ -10,8 +10,17 @@ build/*
 
 vctk/*/
 data/
-AudioMNIST/
 MICEMOUSE/
+AudioMNIST/data*/
+AudioMNIST/csv*/
+
+AudioMNIST/result*/
+AudioMNIST/recording_scripts/
+AudioMNIST/models*/
+AudioMNIST/noise*/
+AudioMNIST/gen*/
+
+
 
 test.flac
 *.pt
