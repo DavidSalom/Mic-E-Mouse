@@ -17,8 +17,8 @@ function sigterm_handler() {
   fi
 }
 
-trap sigterm_handler SIGTERM
-echo "$$" > c_pid
+#trap sigterm_handler SIGTERM
+echo "$$" > c_pid_c
 
 
 #if [[ ! $(sudo echo 0) ]]; then exit; fi

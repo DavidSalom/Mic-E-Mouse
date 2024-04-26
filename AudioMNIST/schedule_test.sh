@@ -21,7 +21,7 @@ function sigterm_handler() {
   fi
 }
 
-trap sigterm_handler SIGTERM
+#trap sigterm_handler SIGTERM
 echo "$$" > c_pid
 
 
