@@ -3,12 +3,33 @@
 # DPI     : 20000 15000 10000  5000
 # POLL    :  8000  4000  2000 
 # VOLUME  :    80    70    60    50
-# = 48 tests
+
+function sigterm_handler() {
+  # happens at 7am until 8pm = 46800 seconds
+  echo "waiting for interval -- sleeping from 7am to 8pm - schedule_test"
+  current_epoch=$(date +%s)
+  target_epoch=$(date -d 'today 20:00' +%s)
+  #target_epoch=$current_epoch
+  #target_epoch=$(date  "+%s" -d "1 second")
+  sleep_seconds=$(( $target_epoch - $current_epoch ))
+
+
+  if [[ $sleep_seconds -ge 0 ]]
+  then
+    echo "sleeping for $sleep_seconds seconds"
+    sleep $sleep_seconds | pv -t
+  fi
+}
+
+trap sigterm_handler SIGTERM
+echo "$$" > c_pid
+
 
 touch c_test
 touch c_spkr
 
 export realdb=0
+
 
 function get_test_id () {
 
@@ -60,6 +81,7 @@ function run_test() {
   v_level="${1: -2}"
   mkdir -p gen/csv
   ./create.sh 0 NONE $v_level
+  rm -rf result/$1
   mv gen/csv result/$1
 
   return 100
@@ -76,7 +98,7 @@ echo "stored test flag: $test_flag"
 #
 
 n_test="$(get_test_id 8000 20000 50)"
-if [[ "$test_flag" == "" ]]
+if [[ "$test_flag" == "" || "$test_flag" == "$n_test" ]]
 then
   run_test "$n_test"
   test_ok=$?
@@ -143,12 +165,12 @@ then
   run_test "$n_test"
 	test_ok=$?
 fi
-n_test="$(get_test_id 2000 5000 50)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
+#n_test="$(get_test_id 2000 5000 50)"
+#if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
+#then
+  #run_test "$n_test"
+	#test_ok=$?
+#fi
 
 #
 ##
@@ -161,74 +183,6 @@ if [[ "$test_flag" == "" ]]
 then
   run_test "$n_test"
   test_ok=$?
-fi
-n_test="$(get_test_id 8000 15000 40)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-n_test="$(get_test_id 8000 10000 40)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-n_test="$(get_test_id 8000 5000 40)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-
-n_test="$(get_test_id 4000 20000 40)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-n_test="$(get_test_id 4000 15000 40)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-n_test="$(get_test_id 4000 10000 40)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-n_test="$(get_test_id 4000 5000 40)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-
-n_test="$(get_test_id 2000 20000 40)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-n_test="$(get_test_id 2000 15000 40)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-n_test="$(get_test_id 2000 10000 40)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-n_test="$(get_test_id 2000 5000 40)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
 fi
 
 #
@@ -243,78 +197,7 @@ then
   run_test "$n_test"
   test_ok=$?
 fi
-n_test="$(get_test_id 8000 15000 30)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-n_test="$(get_test_id 8000 10000 30)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-n_test="$(get_test_id 8000 5000 30)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
 
-n_test="$(get_test_id 4000 20000 30)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-n_test="$(get_test_id 4000 15000 30)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-n_test="$(get_test_id 4000 10000 30)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-n_test="$(get_test_id 4000 5000 30)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-
-n_test="$(get_test_id 2000 20000 30)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-n_test="$(get_test_id 2000 15000 30)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-n_test="$(get_test_id 2000 10000 30)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-n_test="$(get_test_id 2000 5000 30)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-
-
-
-#
 ##
 ### BLOCK 4 - 50dB
 ##
@@ -326,75 +209,6 @@ then
   run_test "$n_test"
   test_ok=$?
 fi
-n_test="$(get_test_id 8000 15000 20)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-n_test="$(get_test_id 8000 10000 20)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-n_test="$(get_test_id 8000 5000 20)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-
-n_test="$(get_test_id 4000 20000 20)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-n_test="$(get_test_id 4000 15000 20)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-n_test="$(get_test_id 4000 10000 20)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-n_test="$(get_test_id 4000 5000 20)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-
-n_test="$(get_test_id 2000 20000 20)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-n_test="$(get_test_id 2000 15000 20)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-n_test="$(get_test_id 2000 10000 20)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-n_test="$(get_test_id 2000 5000 20)"
-if [[ "$test_flag" == "$n_test" || $test_ok -eq 100 ]]
-then
-  run_test "$n_test"
-	test_ok=$?
-fi
-
 #else 
   #echo "failed to match test, delete ./c_test and run script again"
   #exit 1

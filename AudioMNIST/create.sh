@@ -1,6 +1,26 @@
 #!/bin/zsh
 
 
+function sigterm_handler() {
+  # happens at 7am until 8pm = 46800 seconds
+  echo "waiting for interval -- sleeping from 7am to 8pm - create"
+  current_epoch=$(date +%s)
+  target_epoch=$(date -d 'today 20:00' +%s)
+  #target_epoch=$(date  "+%s" -d "1 second")
+  sleep_seconds=$(( $target_epoch - $current_epoch ))
+
+
+  if [[ $sleep_seconds -ge 0 ]]
+  then
+    echo "sleeping for $sleep_seconds seconds"
+    sleep $sleep_seconds | pv -t
+  fi
+}
+
+trap sigterm_handler SIGTERM
+echo "$$" > c_pid
+
+
 #if [[ ! $(sudo echo 0) ]]; then exit; fi
 
 pid_log=0
@@ -46,8 +66,13 @@ percentBar ()  {
     printf -v "$3" '%s%s' "$barstring" "$blankstring"
 }
 
+if [[ ! -s ./c_spkr || ! -f ./c_spkr ]]
+then
+  echo "01" > c_spkr
+fi
 c_spkr=$(cat < ./c_spkr)
-list_dir=($(ls data | sort | sed "0,/^$c_spkr$/d"))
+list_dir=($c_spkr)
+list_dir+=($(ls data | sort | sed "0,/^$c_spkr$/d"))
 
 IFS=$'\n'
 for item in ${list_dir[@]}
@@ -185,7 +210,7 @@ do
 
   echo "$v4 : $item"
   base_file=$(basename $item)
-  base_file=${base_file:2:4}
+  base_file=${base_file:2:2}
   echo "dir : $base_file"
   echo "$base_file" > c_spkr
 
@@ -238,8 +263,6 @@ do
   #
   # repeat for all files
   #
-  # TODO: do we need microphone, if so, we can just arecord [device] [path] with same structure as CSV directories
-  #
   cd ..
 
   out_csv=$(echo $item | sed 's/^data/gen\/csv/' | sed 's/\.wav$/.csv/')
@@ -260,8 +283,6 @@ do
   
   #echo $SECONDS
 
-  # TODO: find the device ID of the speaker when plugged int
-  # flac -c -d -s "vctk/$item" | aplay -q & pid_flac=$(echo $!)
   ffmpeg -i "AudioMNIST/$item" -filter:a "volume=""$boost_level""dB" -f matroska - | ffplay - -autoexit -nodisp
   wait $pid_log
 
