@@ -2,8 +2,8 @@
 
 while true;
 do
-  DATE=`date | cut -d' ' -f4`
-  t_date="08:00:00"
+  DATE=`date "+%T" | cut -d' ' -f4`
+  t_date="20:00:01"
   echo "sleeping: $DATE until $t_date"
   #if [[ $DATE == "08:00:00" ]]
   if [[ $DATE == "$t_date" ]]

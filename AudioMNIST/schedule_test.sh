@@ -74,6 +74,7 @@ function get_test_id () {
 
 function run_test() {
 
+
   # takes one argument - test_id, must run get_test_id first
   # runs with the preloaded settings from get_test_id
   echo "running test: $1"
@@ -83,6 +84,8 @@ function run_test() {
   ./create.sh 0 NONE $v_level
   rm -rf result/$1
   mv gen/csv result/$1
+  
+  rm -f c_spkr
 
   return 100
 }

@@ -217,7 +217,7 @@ do
 
   echo "len : $item_length"
 
-  timeout_length=$(echo "$item_length + 2.00025" | bc -l)
+  timeout_length=$(echo "$item_length + 0.20025" | bc -l)
   
   unint_time=$(echo "$unint_time + $timeout_length" | bc -l)
 
@@ -233,25 +233,25 @@ do
   typeset -F SECONDS=0
 
 
-  if ((unint_time>max_unint_time))
-  then
-    echo "$max_unint_time seconds have passed, taking a 30 minute break"
+  #if ((unint_time>max_unint_time))
+  #then
+    #echo "$max_unint_time seconds have passed, taking a 30 minute break"
 
-    unint_time=0
+    #unint_time=0
 
-    seconds=300
-    start="$(($(date +%s) + $seconds))"
-    while [ "$start" -ge `date +%s` ]; do
-        time="$(( $start - `date +%s` ))"
-        sudo true
-        printf '%s\r' "$(date -u -d "@$time" +%M:%S)"
-    done
-  fi
+    #seconds=300
+    #start="$(($(date +%s) + $seconds))"
+    #while [ "$start" -ge `date +%s` ]; do
+        #time="$(( $start - `date +%s` ))"
+        #sudo true
+        #printf '%s\r' "$(date -u -d "@$time" +%M:%S)"
+    #done
+  #fi
   #continue
   #
 
   #NOTE: TIMELINE:
-  # 1 second: turn on mouse_logger, let values settle 
+  # 200ms second: turn on mouse_logger, let values settle 
   #   | timestamp recorded by program, will be used later
   #   | PUT DATA IN AudioMNIST/gen/csv/[path]
   #   | [path] is the same as $item path
@@ -259,7 +259,7 @@ do
   #   | RECORD TIMESTAMP
   #   | this timestamp will be used later along with the length of the file to cut off the CSV file automatically
   #   | this can be done with: flac -c -d $item | aplay, test on the speaker
-  # 1 second: turn off mouse_logger, then wait 1s to settle
+  # 200ms second: turn off mouse_logger, then wait 200ms to settle
   #
   # repeat for all files
   #

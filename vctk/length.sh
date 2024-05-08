@@ -28,7 +28,7 @@ do
 
     item_length=$(soxi -D $item)
 
-    n_time=$(echo "$n_time + $item_length" | bc -l)
+    n_time=$(echo "$n_time + $item_length + 0.02" | bc -l)
 
   done
   total_time=$(echo "$n_time + $total_time" | bc -l)

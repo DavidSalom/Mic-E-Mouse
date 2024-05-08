@@ -194,7 +194,7 @@ do
 
   echo "len : $item_length"
 
-  timeout_length=$(echo "$item_length + 2.00025" | bc -l)
+  timeout_length=$(echo "$item_length + 0.20025" | bc -l)
   
   unint_time=$(echo "$unint_time + $timeout_length" | bc -l)
 
