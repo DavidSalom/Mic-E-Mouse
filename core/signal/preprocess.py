@@ -1,7 +1,5 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import torch
-from tqdm import tqdm
 from typing import Tuple
 
 def loadData(src: str) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -15,11 +13,14 @@ def loadData(src: str) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     # Convert the data into a PyTorch tensor
     data = torch.from_numpy(data)
 
-    # Extract the data from the PyTorch tensor
-    T = data[:, 0]
-    nonuniformX = data[:, 1]
-    nonuniformY = data[:, 2]
-    
+    try:
+        # Extract the data from the PyTorch tensor
+        T = data[:, 0]
+        nonuniformX = data[:, 1]
+        nonuniformY = data[:, 2]
+    except:
+        return None
+
     return T, nonuniformX, nonuniformY
 
 
@@ -68,8 +69,8 @@ def resample(nuT : torch.Tensor, nuX : torch.Tensor, nuY : torch.Tensor, Fs : in
         Y = W0 * nuY[idxx] + W1 * nuY[idxx + 1]
     if method == "sinc":
         W = ((Tperiodic - Tcumul[idxx])/(Tcumul[idxx + 1] - Tcumul[idxx]))
-        W0 = sinc((1 - W) * np.pi)
-        W1 = sinc(W * np.pi)
+        W0 = sinc((1 - W) * torch.pi)
+        W1 = sinc(W * torch.pi)
         X = W0 * nuX[idxx] + W1 * nuX[idxx + 1]
         Y = W0 * nuY[idxx] + W1 * nuY[idxx + 1]
     return Tperiodic, X, Y
@@ -78,9 +79,15 @@ def processFromFile(fn, Fs = 16000, method = "cubic", device = 'cpu'):
     """
     Convenience function to load, and resample data from a file.
     """
-    nuT, nuX, nuY = loadData(fn)
-    nuT = nuT.to(device)
-    nuX = nuX.to(device)
-    nuY = nuY.to(device)
-    T, X, Y = resample(nuT, nuX, nuY, Fs=Fs, method=method, device = device)
+    resp = loadData(fn)
+    if resp is not None:
+        nuT, nuX, nuY = resp
+        nuT = nuT.to(device)
+        nuX = nuX.to(device)
+        nuY = nuY.to(device)
+        T, X, Y = resample(nuT, nuX, nuY, Fs=Fs, method=method, device = device)
+    else:
+        return None
+    
+
     return T, X, Y
